@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+// Modified by Jian
+#include <iostream>
 
 #include "boost/bind.hpp"
 #include "caffe/internode/mpiutil.hpp"
@@ -234,8 +236,8 @@ void Solver<Dtype>::Step(int iters) {
     }
     const bool display = param_.display() && iter_ % param_.display() == 0;
     net_->set_debug_info(display && param_.debug_info());
+    
     Dtype loss = forward_backward_();
-
     // average the loss across iterations for smoothed reporting
     UpdateSmoothedLoss(loss, start_iter, average_loss);
     if (display) {
@@ -243,6 +245,11 @@ void Solver<Dtype>::Step(int iters) {
       LOG_IF(INFO, Caffe::root_solver())
              << caffe::internode::mpi_get_current_proc_rank_as_string()
              << " Iteration " << iter_ << ", loss = " << smoothed_loss_;
+
+      // // // Modified by Jian
+      // // if (Caffe::root_solver() )
+      //   LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()
+      //     << " Iteration " << iter_ << ", loss = " << smoothed_loss_;
 #else
       LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << iter_
           << ", loss = " << smoothed_loss_;
