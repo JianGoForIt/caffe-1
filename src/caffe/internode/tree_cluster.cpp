@@ -268,9 +268,9 @@ class MpiTreeClient : public TreeWaypoint {
     if (residual * 2 + 1 < group_size) children.push_back(residual * 2 + 1 + offset);
     if (residual * 2 + 2 < group_size) children.push_back(residual * 2 + 2 + offset);
 
-    // DEBUG
-    for (int i = 0; i < children.size(); i++)
-      std::cout << "ckpt children: current " << current << " child " << children[i];
+    // // DEBUG
+    // for (int i = 0; i < children.size(); i++)
+    //   std::cout << "ckpt children: current " << current << " child " << children[i];
 
     return children;
   }
