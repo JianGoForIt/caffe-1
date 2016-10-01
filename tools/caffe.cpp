@@ -67,6 +67,12 @@ DEFINE_int32(comm_threads, 1,
 DEFINE_bool(forward_only, false,
     "Optional; Execute only forward pass");
 
+
+// Modified by Jian
+DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
+    " we want in the async forest");
+
+
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
 typedef std::map<caffe::string, BrewFunction> BrewMap;
@@ -263,6 +269,10 @@ int train() {
         LOG(ERROR) << "currently unsupported";
         return 1;
       }
+
+      // Modified by Jian
+      // this is a global variable
+      caffe::internode::nGroup = FLAGS_n_group;
       caffe::SynchronousNode<float> sync(solver, FLAGS_comm_threads);
       LOG(INFO) << "Starting Multi-node Optimization in mpi environment";
       sync.run();

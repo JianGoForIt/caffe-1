@@ -19,6 +19,7 @@
 #include "caffe/serialization/BlobCodec.hpp"
 
 
+
 const int MSG_TAG = 1972;
 // Message tag to terminate all processes.
 // https://en.wikipedia.org/wiki/Seppuku
@@ -227,28 +228,80 @@ class MpiTreeClient : public TreeWaypoint {
     return mpi_get_comm_size();
   }
 
+  // virtual std::vector<RemoteId> children() const {
+  //   boost::recursive_mutex::scoped_lock lock(mtx);
+  //   std::vector<RemoteId> children;
+  //   RemoteId parent = id();
+  //   int count = mpi_get_comm_size();
+
+  //   if (count < 2) return children;
+
+  //   if (parent * 2 + 1 < count) children.push_back( parent*2+1 );
+  //   if (parent * 2 + 2 < count) children.push_back( parent*2+2 );
+
+  //   return children;
+  // }
+
+  // virtual RemoteId parent() const {
+  //   boost::recursive_mutex::scoped_lock lock(mtx);
+  //   RemoteId current = id();
+
+  //   if (current == 0) return 0;
+
+  //   return floor( (current-1)/2 );
+  // }
+
+  // Modified by Jian
   virtual std::vector<RemoteId> children() const {
     boost::recursive_mutex::scoped_lock lock(mtx);
     std::vector<RemoteId> children;
-    RemoteId parent = id();
+    RemoteId current = id();
     int count = mpi_get_comm_size();
 
-    if (count < 2) return children;
+    int group_size = (count - 1) / nGroup;
+    int group_id = current / group_size;
+    
+    // if (group_size < 2) return children;
 
-    if (parent * 2 + 1 < count) children.push_back( parent*2+1 );
-    if (parent * 2 + 2 < count) children.push_back( parent*2+2 );
+    int offset = group_id * group_size;
+    int residual = current - offset;
+    if (residual * 2 + 1 < group_size) children.push_back(residual * 2 + 1 + offset);
+    if (residual * 2 + 2 < group_size) children.push_back(residual * 2 + 2 + offset);
+
+    // DEBUG
+    for (int i = 0; i < children.size(); i++)
+      std::cout << "ckpt children: current " << current << " child " << children[i];
 
     return children;
   }
 
+  // Modified by Jian
   virtual RemoteId parent() const {
     boost::recursive_mutex::scoped_lock lock(mtx);
     RemoteId current = id();
 
-    if (current == 0) return 0;
+    int count = mpi_get_comm_size();
+    int group_size = (count - 1) / nGroup;
+    int group_id = current / group_size;
 
-    return floor( (current-1)/2 );
+    if (current % group_size == 0) {
+
+      // // DEBUG
+      // std::cout << "ckpt parent: current " << current << " parent " << current << std::endl;
+
+      return current;
+    }
+    else {
+      int offset = group_id * group_size;
+      int residual = current - offset;
+
+      // // DEBUG
+      // std::cout << "ckpt parent: current " << current << " parent " << floor( (residual - 1) / 2 ) + offset << std::endl;
+
+      return floor( (residual - 1) / 2 ) + offset;
+    }
   }
+
 
   virtual void poll_one(shared_ptr<Daemon> daemon) {
     {
