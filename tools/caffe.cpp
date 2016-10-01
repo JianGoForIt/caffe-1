@@ -56,6 +56,11 @@ namespace bp = boost::python;
 #include "caffe/training_utils.hpp"
 #include "caffe/util/signal_handler.h"
 
+
+// Modified by Jian
+#include "caffe/async_ps/async_param_server.hpp"
+
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
@@ -106,6 +111,14 @@ DEFINE_bool(forward_only, false,
     "Optional; Execute only forward pass");
 DEFINE_string(engine, "",
     "Optional; Engine sequence in format: engine:subengine_1,subengine_2,...");
+
+
+// Modified by Jian
+DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
+    " we want in the async forest");
+DEFINE_string(param_server_solver, "",
+    "The dummy solver file with dummy data (do not connect to data server if used)");
+
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -221,6 +234,21 @@ caffe::SolverAction::Enum GetRequestedAction(
   LOG(FATAL) << "Invalid signal effect \""<< flag_value << "\" was specified";
 }
 
+
+// Modified by Jian
+bool IsParameterServer() {
+  // Modified by Jian
+  int mpi_rank;
+  int mpi_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  if (mpi_rank == mpi_size - 1)
+    return true;
+  else
+    return false;
+}
+
+
 // Train / Finetune a model.
 int train() {
   CHECK_GT(FLAGS_solver.size(), 0) << "Need a solver definition to train.";
@@ -229,24 +257,78 @@ int train() {
       "but not both.";
 
   caffe::SolverParameter solver_param;
-  if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
-    caffe::MultiPhaseSolverParameter multi_solver_params;
-    CHECK(caffe::ReadProtoFromTextFile(FLAGS_solver, &multi_solver_params))
-      << "Failed to parse SolverParameter file: "  <<  FLAGS_solver;
-    return multiphase_train(
-      &multi_solver_params,
+// <<<<<<< 37c817036ccffc64123c1ff02f612e06f63f3a1e
+//   if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
+//     caffe::MultiPhaseSolverParameter multi_solver_params;
+//     CHECK(caffe::ReadProtoFromTextFile(FLAGS_solver, &multi_solver_params))
+//       << "Failed to parse SolverParameter file: "  <<  FLAGS_solver;
+//     return multiphase_train(
+//       &multi_solver_params,
+//       FLAGS_solver,
+//       FLAGS_engine,
+//       FLAGS_level,
+//       FLAGS_stage);
+//   }
+
+//   use_flags(
+//     &solver_param,
+//     FLAGS_solver,
+//     FLAGS_engine,
+//     FLAGS_level,
+//     FLAGS_stage);
+// =======
+
+//   if (IsParameterServer() )
+//     caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_param_server_solver, &solver_param);
+//   else
+//     caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
+
+//   solver_param.mutable_train_state()->set_level(FLAGS_level);
+//   for (int i = 0; i < stages.size(); i++) {
+//     solver_param.mutable_train_state()->add_stage(stages[i]);
+//   }
+// >>>>>>> First commit for single server asynchronous architecture
+
+  if (!IsParameterServer() ) {
+    if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
+      caffe::MultiPhaseSolverParameter multi_solver_params;
+      CHECK(caffe::ReadProtoFromTextFile(FLAGS_solver, &multi_solver_params))
+        << "Failed to parse SolverParameter file: "  <<  FLAGS_solver;
+      return multiphase_train(
+        &multi_solver_params,
+        FLAGS_solver,
+        FLAGS_engine,
+        FLAGS_level,
+        FLAGS_stage);
+    }
+
+    use_flags(
+      &solver_param,
       FLAGS_solver,
       FLAGS_engine,
       FLAGS_level,
       FLAGS_stage);
   }
+  else {
+    if (!caffe::ReadProtoFromTextFile(FLAGS_param_server_solver, &solver_param)) {
+      caffe::MultiPhaseSolverParameter multi_solver_params;
+      CHECK(caffe::ReadProtoFromTextFile(FLAGS_param_server_solver, &multi_solver_params))
+        << "Failed to parse SolverParameter file: "  <<  FLAGS_param_server_solver;
+      return multiphase_train(
+        &multi_solver_params,
+        FLAGS_param_server_solver,
+        FLAGS_engine,
+        FLAGS_level,
+        FLAGS_stage);
+    }
 
-  use_flags(
-    &solver_param,
-    FLAGS_solver,
-    FLAGS_engine,
-    FLAGS_level,
-    FLAGS_stage);
+    use_flags(
+      &solver_param,
+      FLAGS_param_server_solver,
+      FLAGS_engine,
+      FLAGS_level,
+      FLAGS_stage);
+  }
 
   // If the gpus flag is not provided, allow the mode and device to be set
   // in the solver prototxt.
@@ -287,9 +369,31 @@ int train() {
   caffe::SignalHandler signal_handler(
         GetRequestedAction(FLAGS_sigint_effect),
         GetRequestedAction(FLAGS_sighup_effect));
-
+  
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
+
+  // // DEBUG
+  // // check the initilization results
+  // float data_val = 0.0;
+  // float diff_val = 0.0;
+  // for (int j = 0; j < solver->net()->layers().size(); j++)
+  //   for (int k = 0; k < solver->net()->layers()[j]->blobs().size(); k++) {
+  //     int size = solver->net()->layers()[j]->blobs()[k]->count();
+  //     const float* data = solver->net()->layers()[j]->blobs()[k]->cpu_data();
+  //     const float* diff = solver->net()->layers()[j]->blobs()[k]->cpu_diff();
+  //     data_val += data[size - 1];
+  //     diff_val += diff[size - 1];
+  //   }
+  // int mpi_rank;
+  // int mpi_size;
+  // MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  // MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  // if (mpi_rank == mpi_size - 1) {
+  // while(1)
+  //   std::cout << "check value equivalence " << data_val << " " << diff_val << std::endl;
+  // }
+
 
   solver->SetActionFunction(signal_handler.GetActionFunction());
 
@@ -303,13 +407,25 @@ int train() {
   if (FLAGS_param_server != "") {
     LOG(INFO) << "Configuring multinode setup";
 
-      if (FLAGS_param_server != "mpi") {
-        LOG(ERROR) << "currently unsupported";
-        return 1;
-      }
+    if (FLAGS_param_server != "mpi") {
+      LOG(ERROR) << "currently unsupported";
+      return 1;
+    }
+
+    caffe::internode::nGroup = FLAGS_n_group;
+    if (IsParameterServer() ) {
+      caffe::async_param_server::AsyncParamServer<float> param_server(solver); 
+      LOG(INFO) << "Starting parameter server in mpi environment";
+      MPI_Barrier(MPI_COMM_WORLD);
+      param_server.Run();
+    }
+    else {
       caffe::SynchronousNode<float> sync(solver, FLAGS_comm_threads);
       LOG(INFO) << "Starting Multi-node Optimization in mpi environment";
+      // Modified by Jian
+      MPI_Barrier(MPI_COMM_WORLD);
       sync.run();
+    }
   } else if (gpus.size() > 1) {
     caffe::P2PSync<float> sync(solver, NULL, solver->param());
     sync.Run(gpus);
@@ -318,6 +434,7 @@ int train() {
     solver->Solve();
   }
   LOG(INFO) << "Optimization Done.";
+
   return 0;
 }
 RegisterBrewFunction(train);

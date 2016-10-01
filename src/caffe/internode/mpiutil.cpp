@@ -45,8 +45,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mpi.h>
 #endif
 
+template <typename Dtype>
+MPI_Datatype DtypeToMPIDtype() { return MPI_FLOAT; };
+
+template<>  
+MPI_Datatype DtypeToMPIDtype<float>() { return MPI_FLOAT; }
+
+template<> 
+MPI_Datatype DtypeToMPIDtype<double>() { return MPI_DOUBLE; }
+
+
 namespace caffe {
 namespace internode {
+
+// Modified by Jian
+int nGroup = 1;
 
 int init_count = 0;
 
@@ -144,8 +157,8 @@ void mpi_init(int argc, char** argv) {
   char name[MPI_MAX_PROCESSOR_NAME];
 
   int provided = 0;
-  MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
-  assert(provided == MPI_THREAD_FUNNELED);
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+  assert(provided == MPI_THREAD_MULTIPLE);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Get_processor_name(name, &namelen);

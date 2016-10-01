@@ -118,7 +118,7 @@ class MpiClient : public Waypoint {
             MPI_ANY_SOURCE,
             MPI_ANY_TAG,
             MPI_COMM_WORLD,
-            &requests.back().first);
+            &requests.back().first);        
   }
 
   void received(bool ok, int size, int sender) {

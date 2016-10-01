@@ -62,6 +62,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "caffe/serialization/ProtoSerialize.hpp"
 #include "caffe/util/device_alternate.hpp"
 
+// Modified by Jian
+#include "caffe/async_ps/async_param_server.hpp"
+// #include <sys/types.h>
+// #include <unistd.h>
+#include <mpi.h>
+
+
+
 namespace caffe {
 
 #define CLOG(arg) \
@@ -205,6 +213,7 @@ class SynchronousSync : public InternalThread
   boost::thread::id solver_thread_id;
   int snapshot_per_iters;
   vector<pair<int, uint32_t> > layers_to_update;
+
  public:
   shared_ptr<BlobKeyChain<Dtype> > keychain;
  public:
@@ -381,11 +390,37 @@ class SynchronousSync : public InternalThread
     CVLOG(2) << "layer " << layer_id
                << " gradients are in synced with version " << version;
     if (is_root()) {
-      boost::mutex::scoped_lock lock(mtx);
+      // Modified by Jian
+      // if the node is root push the gradient 
+      // we assign the last node to be the async server
+	    boost::mutex::scoped_lock lock(mtx);
+      
+      int mpi_size;
+      int param_server_rank;
+      int mpi_rank;
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+      param_server_rank = mpi_size - 1;
+      int n_blob = solver->net()->layers()[layer_id]->blobs().size();
+      for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+        Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+        async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+        MPI_Request dump_req;
+        int tag = task.GetTag();
+        
+        // logically, as the corresponding receive would not start
+        // until Isend finishes. No nne will touch this memory 
+        // until the Irecv request finish. So we only do MPI_wait
+        // after the corresponding Irecv in apply_update
+        MPI_Isend(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
+          param_server_rank, tag, MPI_COMM_WORLD, &dump_req);
+      }
+
       layers_to_update.push_back(make_pair(layer_id, version));
     }
     layers.at(layer_id).wake_up();
   }
+  
 
   virtual void synced_gradients(uint32_t version) {
     CVLOG(2) << "net gradients are synced with version: " << version;
@@ -483,9 +518,33 @@ class SynchronousSync : public InternalThread
 
     vector<int> param_ids =
       solver->net()->get_layer_learnable_param_ids(layer_id);
-    for (int i = 0; i < param_ids.size(); ++i) {
-      solver->ApplyUpdate(param_ids[i]);
+
+    // Modified by Jian
+    // for (int i = 0; i < param_ids.size(); ++i) {
+    //   solver->ApplyUpdate(param_ids[i]);
+    // }
+    
+    int mpi_size;
+    int param_server_rank;
+    int mpi_rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    param_server_rank = mpi_size - 1;
+    int n_blob = solver->net()->layers()[layer_id]->blobs().size();
+    MPI_Request* recv_req = (MPI_Request*)malloc(sizeof(MPI_Request) * n_blob);
+    for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+      Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+      async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+      int tag = task.GetTag();
+
+      MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+        param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
     }
+    MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
+    free(recv_req);
+    // end of modification
+
+
     for (int j = 0; j < param_ids.size(); ++j)
       solver->net()->ClearParamDiffs(param_ids[j]);
     keychain->unlock(layer_id);

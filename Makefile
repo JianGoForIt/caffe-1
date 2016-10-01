@@ -215,7 +215,7 @@ ifneq ($(CPU_ONLY), 1)
 	LIBRARIES := cudart cublas curand
 endif
 
-LIBRARIES += glog gflags protobuf boost_system boost_filesystem m hdf5_hl hdf5
+LIBRARIES += gflags glog protobuf boost_system boost_filesystem m hdf5_hl hdf5 mpi
 
 # handle IO dependencies
 USE_LEVELDB ?= 1
@@ -301,6 +301,10 @@ ifeq ($(LINUX), 1)
 	# We will also explicitly add stdc++ to the link target.
 	LIBRARIES += boost_thread stdc++
 	VERSIONFLAGS += -Wl,-soname,$(DYNAMIC_VERSIONED_NAME_SHORT) -Wl,-rpath,$(ORIGIN)/../lib
+
+	# Modified by Jian
+	CXXFLAGS += -std=c++11 -fmax-errors=5 
+
 endif
 
 # OS X:

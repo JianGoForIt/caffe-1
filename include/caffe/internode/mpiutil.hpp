@@ -41,8 +41,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <map>
 #include <string>
 
+// Modified by Jian
+#include <mpi.h>
+
+// #ifndef MSG_ASYNC
+// #define MSG_ASYNC 
+
+// Modified by Jian
+// Compile time mapping from typename Dtype to MPI_Datatype
+template <typename Dtype>
+MPI_Datatype DtypeToMPIDtype();
+
+
 namespace caffe {
 namespace internode {
+
+// Modified by Jian
+extern int nGroup;
 
 int mpi_get_current_proc_rank();
 std::string mpi_get_current_proc_rank_as_string();

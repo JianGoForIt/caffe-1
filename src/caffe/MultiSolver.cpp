@@ -41,6 +41,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "caffe/internode/tree_cluster.hpp"
 #include "caffe/MultiSolver.hpp"
 
+
+// Modified by Jian
+#include <iostream>
+#include <mpi.h>
+
 namespace caffe {
 
 template <typename Dtype>
@@ -63,11 +68,13 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
     }
     vector<int> param_ids = net.get_layer_learnable_param_ids(i);
     loss += root_solver_->net()->ForwardFromTo(i, i);
+
     if (last) {
       for (int j = 0; j < callbacks_.size(); ++j) {
         callbacks_[j]->on_forward_finished(i);
       }
     }
+
   }
 
   for (int i = net.layers().size() - 1; i >= 0; --i) {
