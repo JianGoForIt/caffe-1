@@ -11,6 +11,18 @@ namespace internode {
 // Modified by Jian
 extern int nGroup;
 
+// Modified by Jian
+// Compile time mapping from typename Dtype to MPI_Datatype
+template <typename Dtype>
+struct DtypeToMPIDtype {};
+
+template<> struct DtypeToMPIDtype<float> {
+  const static MPI_Datatype type = MPI_FLOAT;
+};
+template<> struct DtypeToMPIDtype<double> {
+  const static MPI_Datatype type = MPI_DOUBLE;
+};
+
 int mpi_get_current_proc_rank();
 std::string mpi_get_current_proc_rank_as_string();
 int mpi_get_comm_size();

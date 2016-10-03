@@ -336,6 +336,10 @@ class SynchronousSync : public InternalThread
     if (!is_root()) {
       comms_up->push(layer_id, blob_id, part, version);
     }
+
+    // Modified by Jian
+    // TODO
+    // Push to parameter server
   }
 
   virtual void synced_gradients(int layer_id, uint32_t version) {
