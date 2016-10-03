@@ -8,6 +8,15 @@
 #include <mpi.h>
 #endif
 
+template <typename Dtype>
+MPI_Datatype DtypeToMPIDtype() { return MPI_FLOAT; };
+
+template<>  
+MPI_Datatype DtypeToMPIDtype<float>() { return MPI_FLOAT; }
+
+template<> 
+MPI_Datatype DtypeToMPIDtype<double>() { return MPI_DOUBLE; }
+
 
 namespace caffe {
 namespace internode {
