@@ -26,6 +26,10 @@
 #include "caffe/serialization/ProtoSerialize.hpp"
 #include "caffe/util/device_alternate.hpp"
 
+// Modified by Jian
+#include "caffe/async_ps/async_param_server.hpp"
+
+
 namespace caffe {
 
 #define CLOG(arg) \
@@ -336,10 +340,44 @@ class SynchronousSync : public InternalThread
     if (!is_root()) {
       comms_up->push(layer_id, blob_id, part, version);
     }
+    else {
 
-    // Modified by Jian
-    // TODO
-    // Push to parameter server
+      std::cout << "ckpt of send std " << std::endl;
+      LOG(INFO) << "ckpt of send";
+
+      // Modified by Jian
+      // if the node is root push the gradient 
+      // we assign the last node to be the async server
+      int mpi_size;
+      int param_server_rank;
+      int mpi_rank;
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+      param_server_rank = mpi_size - 1;
+      Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+      async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+      MPI_Status dump_status;
+      int tag = task.GetTag();
+      MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
+        param_server_rank, tag, MPI_COMM_WORLD);
+
+
+      // DEBUG
+      LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
+        << " " << blob_id << " " << solver->iter();
+
+
+      MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+        param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+
+
+      // DEBUG
+      LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
+        << " " << blob_id << " " << solver->iter();
+
+
+    }
+
   }
 
   virtual void synced_gradients(int layer_id, uint32_t version) {
@@ -448,9 +486,15 @@ class SynchronousSync : public InternalThread
 
     vector<int> param_ids =
       solver->net()->get_layer_learnable_param_ids(layer_id);
-    for (int i = 0; i < param_ids.size(); ++i) {
-      solver->ApplyUpdate(param_ids[i]);
-    }
+
+
+    // Modified by Jian
+    // for (int i = 0; i < param_ids.size(); ++i) {
+    //   solver->ApplyUpdate(param_ids[i]);
+    // }
+    // end of modification
+
+
     for (int j = 0; j < param_ids.size(); ++j)
       solver->net()->ClearParamDiffs(param_ids[j]);
     keychain->unlock(layer_id);

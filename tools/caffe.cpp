@@ -18,6 +18,11 @@ namespace bp = boost::python;
 #include "caffe/multinode/multinode.hpp"
 #include "caffe/util/signal_handler.h"
 
+
+// Modified by Jian
+#include "caffe/async_ps/async_param_server.hpp"
+
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
@@ -265,17 +270,30 @@ int train() {
   if (FLAGS_param_server != "") {
     LOG(INFO) << "Configuring multinode setup";
 
-      if (FLAGS_param_server != "mpi") {
-        LOG(ERROR) << "currently unsupported";
-        return 1;
-      }
+    if (FLAGS_param_server != "mpi") {
+      LOG(ERROR) << "currently unsupported";
+      return 1;
+    }
 
-      // Modified by Jian
-      // this is a global variable
-      caffe::internode::nGroup = FLAGS_n_group;
+    // Modified by Jian
+    // this is a global variable
+    int mpi_rank;
+    int mpi_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    caffe::internode::nGroup = FLAGS_n_group;
+    if (mpi_rank == mpi_size - 1) {
+      caffe::async_param_server::AsyncParamServer<float> param_server(solver); 
+      MPI_Barrier(MPI_COMM_WORLD);
+      param_server.Run();
+    }
+    else {
       caffe::SynchronousNode<float> sync(solver, FLAGS_comm_threads);
       LOG(INFO) << "Starting Multi-node Optimization in mpi environment";
+      // Modified by Jian
+      MPI_Barrier(MPI_COMM_WORLD);
       sync.run();
+    }
   } else if (gpus.size() > 1) {
     caffe::P2PSync<float> sync(solver, NULL, solver->param());
     sync.Run(gpus);

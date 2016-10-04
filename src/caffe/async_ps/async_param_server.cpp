@@ -34,11 +34,24 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         buf_ptr_[make_pair(root_rank, make_pair(j, k) ) ] = 
           make_pair(buf, blob_size);
 
-        // TODO note here according to the intel impelmentation, there is only 1 part for each blob
+        // TODO note here according to the intel impelmentation, 
+        // there is only 1 part for each blob.
+        // Start listening before the task is insert into the queue
         TaskRequest recv_task(root_rank, j, k, 0);
+
+        // start a new listening to wait for message from roots
+        MPI_Irecv(buf, blob_size, DtypeToMPIDtype<Dtype>(), root_rank,
+          recv_task.GetTag(), MPI_COMM_WORLD, &(recv_task.mpi_request_) );
+
         recv_tasks_.push_back(recv_task);
         rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(j, k) ) ] = 
           recv_tasks_.size() - 1;
+
+
+        // DEBUG
+        std::cout << "ckpt init recv done " << root_rank << " " << j << " " << k << " " << recv_tasks_.size() - 1 << std::endl;
+
+
       }
   }
 
@@ -50,6 +63,8 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 }
 
 
+// TODO Jian how to get the correct iter number potentially get the version and set iter before update
+
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessUpdateTask() {
   update_queue_mutex_.lock();
@@ -57,6 +72,12 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     TaskRequest task = update_tasks_.front();
     update_tasks_.pop_front();
     update_queue_mutex_.unlock();
+
+        // DEBUG
+    LOG(INFO) << " launched send task for " << task.root_rank_ 
+      << " " << task.layer_id_ << " " << task.blob_id_;
+
+
     // copy to diff in solver
     Blob<Dtype>* blob = blob_accessor_->get_blob(task.layer_id_, task.blob_id_);
     Dtype* solver_diff = blob->mutable_cpu_diff();
@@ -70,6 +91,7 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     int param_id = solver_->net()->get_layer_learnable_param_ids(task.layer_id_)[task.blob_id_];
     solver_->ApplyUpdate(param_id);
     solver_->net()->ClearParamDiffs(param_id);
+    update_cnt_ += 1;
 
     // copy model(data) in solver to mpi buffer
     Dtype* solver_data = blob->mutable_cpu_data();
@@ -95,6 +117,12 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     send_tasks_.pop_front();
     // unlock to permit insert send task on the other thread
     send_queue_mutex_.unlock();
+
+
+    // DEBUG
+    LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
+
+
     std::pair<Dtype*, int64_t> buf = 
       buf_ptr_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
     Dtype* ptr = buf.first;
@@ -104,12 +132,12 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     MPI_Request dump_request;
     MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
       tag, MPI_COMM_WORLD, &dump_request);
+    send_cnt_ += 1;
+
     // start a new listening to wait for message from roots
     int vec_pos = rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
     MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
       tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
-
-    // TODO Jian !!! hook the mpi type
   }
   else
     send_queue_mutex_.unlock();

@@ -12,6 +12,6 @@ echo "executing 4 nodes with mpirun"
 
 OMP_NUM_THREADS=1 \
 mpirun -v \
--hostfile examples/cifar10/hosts.txt -n 4 \
-$TOOLS/caffe train --solver=examples/cifar10/cifar10_full_solver_sync_param_server.prototxt --param_server=mpi --n_group=2
+-hostfile examples/cifar10/hosts.txt -n 5 \
+$TOOLS/caffe train --solver=examples/cifar10/cifar10_full_solver_sync_param_server.prototxt --param_server=mpi --n_group=1
 
