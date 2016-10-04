@@ -54,12 +54,6 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 
       }
   }
-
-  // // setup solver blob mutex 
-  // for (int j = 0; j < solver_->net()->layers().size; j++)
-  //   for (int k = 0; k < solver->net()->layers()[j].size; k++) {
-  //     solver_blob_mutex_.insert(make_pair(make_pair(j, k), new boost::mutex) );
-  //   }
 }
 
 
@@ -67,16 +61,13 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessUpdateTask() {
+  std::deque<TaskRequest> to_update;
   update_queue_mutex_.lock();
-  if (!update_tasks_.empty() ) {
-    TaskRequest task = update_tasks_.front();
-    update_tasks_.pop_front();
-    update_queue_mutex_.unlock();
-
-        // DEBUG
-    LOG(INFO) << " launched send task for " << task.root_rank_ 
-      << " " << task.layer_id_ << " " << task.blob_id_;
-
+  to_update.swap(update_tasks_);
+  update_queue_mutex_.unlock();
+  while (!to_update.empty() ) {
+    TaskRequest task = to_update.front();
+    to_update.pop_front();
 
     // copy to diff in solver
     Blob<Dtype>* blob = blob_accessor_->get_blob(task.layer_id_, task.blob_id_);
@@ -100,24 +91,29 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     send_queue_mutex_.lock();
     send_tasks_.push_back(task);
     send_queue_mutex_.unlock();
+
+
+            // DEBUG
+    LOG(INFO) << " push send task for " << task.root_rank_ 
+      << " " << task.layer_id_ << " " << task.blob_id_;
+
+
   }
-  else
-    update_queue_mutex_.unlock();
 }
 
 
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessSendTask() {
+  std::deque<TaskRequest> to_send;
   send_queue_mutex_.lock();
-  if (!send_tasks_.empty() ) {
-    int root_rank = send_tasks_.front().root_rank_;
-    int layer_id = send_tasks_.front().layer_id_;
-    int blob_id = send_tasks_.front().blob_id_;
-    int tag = send_tasks_.front().GetTag();
-    send_tasks_.pop_front();
-    // unlock to permit insert send task on the other thread
-    send_queue_mutex_.unlock();
-
+  to_send.swap(send_tasks_);
+  send_queue_mutex_.unlock();
+  while (!to_send.empty() ) {
+    int root_rank = to_send.front().root_rank_;
+    int layer_id = to_send.front().layer_id_;
+    int blob_id = to_send.front().blob_id_;
+    int tag = to_send.front().GetTag();
+    to_send.pop_front();
 
     // DEBUG
     LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
@@ -139,24 +135,40 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
       tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
   }
-  else
-    send_queue_mutex_.unlock();
 }
 
 
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessRecvTask() {
   int flag = 0;
-  while(flag == 0) {
-    MPI_Request request = recv_tasks_[recv_tasks_iter_].mpi_request_;
-    MPI_Test(&request, &flag, MPI_STATUS_IGNORE);
+  for (int i = 0; i < recv_tasks_.size(); i++) {
+    //  // DEBUG
+    // LOG(INFO) << " ckpt 0 process recv task for " << recv_tasks_[recv_tasks_iter_].root_rank_ 
+    //   << " " << recv_tasks_[recv_tasks_iter_].layer_id_ << " " << recv_tasks_[recv_tasks_iter_].blob_id_ << " " << flag;
+
+    if (recv_tasks_[recv_tasks_iter_].mpi_request_ != MPI_REQUEST_NULL) {
+
+      MPI_Test(&(recv_tasks_[recv_tasks_iter_].mpi_request_), &flag, MPI_STATUS_IGNORE);
+
+
+      //  // DEBUG
+      // LOG(INFO) << " ckpt 2 process recv task for " << recv_tasks_[recv_tasks_iter_].root_rank_ 
+      //   << " " << recv_tasks_[recv_tasks_iter_].layer_id_ << " " << recv_tasks_[recv_tasks_iter_].blob_id_ << " " << flag;
+
+
+
+      if (flag) {
+        // currently no need to lock the solver buffer, as comp thread
+        // takes care of two copy operations.
+        update_queue_mutex_.lock();
+        update_tasks_.push_back(recv_tasks_[recv_tasks_iter_] );
+        update_queue_mutex_.unlock();
+      }
+    }
     recv_tasks_iter_ = (recv_tasks_iter_ + 1) % recv_tasks_.size();
+    if (flag)
+      break;
   }
-  // currently no need to lock the solver buffer, as comp thread
-  // takes care of two copy operations.
-  update_queue_mutex_.lock();
-  update_tasks_.push_back(recv_tasks_[recv_tasks_iter_] );
-  update_queue_mutex_.unlock();
 }
 
 
