@@ -126,14 +126,21 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     // We do not need to care about the request. Because if the blocking recv
     // has not finished on root, it will not start a new send task
     MPI_Request dump_request;
-    MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
-      tag, MPI_COMM_WORLD, &dump_request);
+    // MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
+    //   tag, MPI_COMM_WORLD, &dump_request);
+    MPI_Send(ptr, 1, DtypeToMPIDtype<Dtype>(), root_rank, 
+      tag, MPI_COMM_WORLD);
     send_cnt_ += 1;
 
     // start a new listening to wait for message from roots
     int vec_pos = rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
-    MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
+    // MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
+    //   tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
+    
+    MPI_Irecv(ptr, 1, DtypeToMPIDtype<Dtype>(), root_rank,
       tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
+
+
   }
 }
 

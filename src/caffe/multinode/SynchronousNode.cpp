@@ -28,7 +28,8 @@
 
 // Modified by Jian
 #include "caffe/async_ps/async_param_server.hpp"
-
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace caffe {
 
@@ -173,6 +174,13 @@ class SynchronousSync : public InternalThread
   boost::thread::id solver_thread_id;
   int snapshot_per_iters;
   vector<pair<int, uint32_t> > layers_to_update;
+
+
+  // // Modified by Jian
+  // std::vector<TaskRequest> to_async_server_;
+  // boost::mutex to_async_server_mutex_;
+
+
  public:
   shared_ptr<BlobKeyChain<Dtype> > keychain;
  public:
@@ -257,10 +265,24 @@ class SynchronousSync : public InternalThread
   }
 
   virtual void received_from_parent(char* buffer, size_t size) {
+
+    // // DEBUG
+    //       int MPI_rank;
+    //   MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+    // LOG(INFO) << "trace track ckpt 1 from pa rank " << MPI_rank;
+
+
     comms_up->received(buffer, size, up_waypoint.get());
   }
   virtual void received_from_child(char* buffer, size_t size, RemoteId id) {
     UpDownWaypoint<false> down_waypoint(id);
+
+    // //DEBUG
+    //           int MPI_rank;
+    //   MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+    // LOG(INFO) << "trace track ckpt 1 from child rank " << MPI_rank;
+
+
     comms_down->received(buffer, size, &down_waypoint);
   }
 
@@ -340,11 +362,12 @@ class SynchronousSync : public InternalThread
     if (!is_root()) {
       comms_up->push(layer_id, blob_id, part, version);
     }
-    else {
+  }
 
-      std::cout << "ckpt of send std " << std::endl;
-      LOG(INFO) << "ckpt of send";
-
+  virtual void synced_gradients(int layer_id, uint32_t version) {
+    CVLOG(2) << "layer " << layer_id
+               << " gradients are in synced with version " << version;
+    if (is_root()) {
       // Modified by Jian
       // if the node is root push the gradient 
       // we assign the last node to be the async server
@@ -354,36 +377,44 @@ class SynchronousSync : public InternalThread
       MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
       param_server_rank = mpi_size - 1;
-      Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
-      async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
-      MPI_Status dump_status;
-      int tag = task.GetTag();
-      MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
-        param_server_rank, tag, MPI_COMM_WORLD);
+      // keychain->lock(layer_id);
+      int n_blob = solver->net()->layers()[layer_id]->blobs().size();
+      for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+        Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+        async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+        MPI_Status dump_status;
+        int tag = task.GetTag();
+
+        // DEBUG
+        LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
+          << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
+
+        // MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
+        //   param_server_rank, tag, MPI_COMM_WORLD);
+        
+        Dtype* tmp = (Dtype*)std::malloc(sizeof(Dtype) * blob->count() );
+        MPI_Send(tmp, 1, DtypeToMPIDtype<Dtype>(), 
+          param_server_rank, tag, MPI_COMM_WORLD);
 
 
-      // DEBUG
-      LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
-        << " " << blob_id << " " << solver->iter();
+        // DEBUG
+        LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
+          << " " << blob_id << " " << solver->iter();
 
 
-      MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
-        param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+         // MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+         //  param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+        MPI_Recv(tmp, 1, DtypeToMPIDtype<Dtype>(),
+          param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+        delete[] tmp;
+
+        //       // DEBUG
+        // LOG(INFO) << " RECV on root done " << mpi_rank << " " << layer_id 
+        //   << " " << blob_id << " " << solver->iter();
 
 
-      // DEBUG
-      LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
-        << " " << blob_id << " " << solver->iter();
-
-
-    }
-
-  }
-
-  virtual void synced_gradients(int layer_id, uint32_t version) {
-    CVLOG(2) << "layer " << layer_id
-               << " gradients are in synced with version " << version;
-    if (is_root()) {
+      }
+      // keychain->unlock(layer_id);
       boost::mutex::scoped_lock lock(mtx);
       layers_to_update.push_back(make_pair(layer_id, version));
     }

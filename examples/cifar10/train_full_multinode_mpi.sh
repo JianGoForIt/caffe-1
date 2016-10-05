@@ -15,3 +15,4 @@ mpirun -v \
 -hostfile examples/cifar10/hosts.txt -n 5 \
 $TOOLS/caffe train --solver=examples/cifar10/cifar10_full_solver_sync_param_server.prototxt --param_server=mpi --n_group=1
 
+ls ./build

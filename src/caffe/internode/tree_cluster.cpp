@@ -19,6 +19,11 @@
 #include "caffe/serialization/BlobCodec.hpp"
 
 
+// Modified by Jian
+#include <sys/types.h>
+#include <unistd.h>
+
+
 
 const int MSG_TAG = 1972;
 // Message tag to terminate all processes.
@@ -84,6 +89,13 @@ class MpiTreeClient : public TreeWaypoint {
         }
       } else {
         for (int i = 0; i < handlers.size(); ++i) {
+
+    //           //DEBUG
+    //           int MPI_rank;
+    //   MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+    // LOG(INFO) << "trace track ckpt 2 from child rank " << MPI_rank;
+
+
           to_call[i]->received_from_child(&buffer.front(), size, sender);
         }
       }
@@ -211,6 +223,16 @@ class MpiTreeClient : public TreeWaypoint {
       total_requests = requests.size();
     }
     DLOG(INFO) << "**** (async_send_to_children) requests: " << total_requests;
+
+
+    // DEBUG
+    int MPI_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+    if (MPI_rank == 0)
+    LOG(INFO) << " communication rank " << MPI_rank << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
+ 
+
+
   }
 
   virtual void register_receive_handler(Handler* handler) {
@@ -304,7 +326,24 @@ class MpiTreeClient : public TreeWaypoint {
 
 
   virtual void poll_one(shared_ptr<Daemon> daemon) {
+    // Modified by Jian
     {
+      boost::recursive_mutex::scoped_lock lock(mtx);
+      if (!main_thread_id) {
+        main_thread_id = boost::this_thread::get_id();
+      }
+      assert(*main_thread_id == boost::this_thread::get_id());      
+    }
+
+
+    {
+
+      // DEBUG
+      // LOG(INFO) << " poll one in thread " << boost::this_thread::get_id();
+      // while(1);
+
+
+
       boost::recursive_mutex::scoped_lock lock(mtx);
       if (!main_thread_id) {
         main_thread_id = boost::this_thread::get_id();

@@ -17,6 +17,10 @@
 #include "caffe/util/blocking_queue.hpp"
 #include "caffe/util/math_functions.hpp"
 
+
+// Modified by Jian
+#include <mpi.h>
+
 namespace caffe {
 
 using internode::RemoteId;
@@ -311,13 +315,35 @@ struct BlobCommsImpl : BlobComms<Dtype> {
     if (UseThreads) {
       get_worker()->push_job(data, size, waypoint->id());
     } else {
+
+
+      // // DEBUG
+      // int MPI_rank;
+      // MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+      // LOG(INFO) << "trace track ckpt 0 rank " << MPI_rank;
+
+
       handle(data, size, waypoint->id());
+
+
+      //       // DEBUG
+      // LOG(INFO) << "trace track ckpt 0.5 rank " << MPI_rank;
+
+
     }
   }
 
   void handle(char* data, size_t size, RemoteId id) {
     BlobUpdate msg;
     if (!deserialize(data, size, &msg)) {
+
+
+      // DEBUG
+      int MPI_rank;
+      MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+      std::cout << " desirialize failed on rank " << MPI_rank << " " << id << std::endl;
+
+
       LOG(ERROR) << "deserialize failed";
       return;
     }
