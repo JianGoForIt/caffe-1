@@ -31,9 +31,10 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         // buf_ptr_.insert(make_pair(make_pair(root_rank, 
         //   make_pair(j, k) ), make_pair(NULL, 0) ) );
         Dtype* buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
-        buf_ptr_[make_pair(root_rank, make_pair(j, k) ) ] = 
+        recv_buf_[make_pair(root_rank, make_pair(j, k) ) ] = 
           make_pair(buf, blob_size);
 
+        // setup buf for recv
         // TODO note here according to the intel impelmentation, 
         // there is only 1 part for each blob.
         // Start listening before the task is insert into the queue
@@ -44,6 +45,11 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         // start a new listening to wait for message from roots
         MPI_Irecv(buf, blob_size, DtypeToMPIDtype<Dtype>(), root_rank,
           recv_task.GetTag(), MPI_COMM_WORLD, &(recv_tasks_[recv_tasks_.size() - 1].mpi_request_) );
+      
+        // Setup buf for send
+        buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
+        send_buf_[make_pair(root_rank, make_pair(j, k) ) ] = 
+          make_pair(buf, blob_size);
       }
   }
 }
@@ -64,9 +70,9 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     Blob<Dtype>* blob = blob_accessor_->get_blob(task.layer_id_, task.blob_id_);
     Dtype* solver_diff = blob->mutable_cpu_diff();
     Dtype* mpi_buf = 
-      buf_ptr_[make_pair(task.root_rank_, make_pair(task.layer_id_, task.blob_id_) ) ].first;
+      recv_buf_[make_pair(task.root_rank_, make_pair(task.layer_id_, task.blob_id_) ) ].first;
     int64_t count = 
-      buf_ptr_[make_pair(task.root_rank_, make_pair(task.layer_id_, task.blob_id_) ) ].second;
+      recv_buf_[make_pair(task.root_rank_, make_pair(task.layer_id_, task.blob_id_) ) ].second;
     assert(count == blob->count() );
     std::memcpy(solver_diff, mpi_buf, sizeof(Dtype) * count);
     // apply update
@@ -76,6 +82,7 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     update_cnt_ += 1;
 
     // copy model(data) in solver to mpi buffer
+    mpi_buf = send_buf_[make_pair(task.root_rank_, make_pair(task.layer_id_, task.blob_id_) ) ].first;
     Dtype* solver_data = blob->mutable_cpu_data();
     std::memcpy(mpi_buf, solver_data, sizeof(Dtype) * count);
 
@@ -107,17 +114,19 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     // LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
 
     std::pair<Dtype*, int64_t> buf = 
-      buf_ptr_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
+      send_buf_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
     Dtype* ptr = buf.first;
     int count = buf.second;
     // We do not need to care about the request. Because if the blocking recv
     // has not finished on root, it will not start a new send task
     MPI_Request dump_request;
-    MPI_Send(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
-      tag, MPI_COMM_WORLD);
+    MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
+      tag, MPI_COMM_WORLD, &dump_request);
+
     send_cnt_ += 1;
 
     // start a new listening to wait for message from roots
+    ptr = recv_buf_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ].first;
     int vec_pos = rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
     MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
       tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );

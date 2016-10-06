@@ -62,8 +62,10 @@ public:
     for (int i = 0; i < caffe::internode::nGroup; i++) {
       int root_rank = mpi_size / caffe::internode::nGroup * i;
       for (int j = 0; j < solver_->net()->layers().size(); j++)
-        for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++)
-          std::free(buf_ptr_[make_pair(root_rank, make_pair(j, k) ) ].first);
+        for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
+          std::free(send_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
+          std::free(recv_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
+        }
     }
   };
   // in the update task, the compute thread 
@@ -97,7 +99,8 @@ private:
   std::vector<TaskRequest> recv_tasks_;
   std::map<std::pair<int, std::pair<int, int> >, int> rank_layer_blob_to_vec_pos;
   // root_rank, layer_id, blob_id
-  std::map<std::pair<int, std::pair<int, int> >, std::pair<Dtype*, int64_t> > buf_ptr_;
+  std::map<std::pair<int, std::pair<int, int> >, std::pair<Dtype*, int64_t> > recv_buf_;
+  std::map<std::pair<int, std::pair<int, int> >, std::pair<Dtype*, int64_t> > send_buf_;
 
   // for computation
   boost::shared_ptr<Solver<Dtype> > solver_;
