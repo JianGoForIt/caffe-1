@@ -50,6 +50,9 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
         send_buf_[make_pair(root_rank, make_pair(j, k) ) ] = 
           make_pair(buf, blob_size);
+
+        // setup iter
+        async_iter_[make_pair(i, j) ] = solver_->iter();
       }
   }
 }
@@ -76,9 +79,13 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     assert(count == blob->count() );
     std::memcpy(solver_diff, mpi_buf, sizeof(Dtype) * count);
     // apply update
+    int blob_wise_iter = async_iter_[make_pair(task.layer_id_, task.blob_id_) ];
+
+    solver_->set_iter(blob_wise_iter);
     int param_id = solver_->net()->get_layer_learnable_param_ids(task.layer_id_)[task.blob_id_];
     solver_->ApplyUpdate(param_id);
     solver_->net()->ClearParamDiffs(param_id);
+    async_iter_[make_pair(task.layer_id_, task.blob_id_) ] += 1;
     update_cnt_ += 1;
 
     // copy model(data) in solver to mpi buffer
@@ -122,9 +129,7 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     MPI_Request dump_request;
     MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
       tag, MPI_COMM_WORLD, &dump_request);
-
     send_cnt_ += 1;
-
     // start a new listening to wait for message from roots
     ptr = recv_buf_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ].first;
     int vec_pos = rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];

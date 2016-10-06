@@ -111,6 +111,10 @@ private:
   // needed in total
   int64_t send_cnt_;
   int64_t update_cnt_; 
+
+
+  // iter for different blobs
+  std::map<std::pair<int, int>, int64_t> async_iter_;
 };
 
 } // end of namespace async_param_server

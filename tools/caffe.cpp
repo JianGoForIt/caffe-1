@@ -258,6 +258,28 @@ int train() {
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
 
+  // // DEBUG
+  // // check the initilization results
+  // float data_val = 0.0;
+  // float diff_val = 0.0;
+  // for (int j = 0; j < solver->net()->layers().size(); j++)
+  //   for (int k = 0; k < solver->net()->layers()[j]->blobs().size(); k++) {
+  //     int size = solver->net()->layers()[j]->blobs()[k]->count();
+  //     const float* data = solver->net()->layers()[j]->blobs()[k]->cpu_data();
+  //     const float* diff = solver->net()->layers()[j]->blobs()[k]->cpu_diff();
+  //     data_val += data[size - 1];
+  //     diff_val += diff[size - 1];
+  //   }
+  // int mpi_rank;
+  // int mpi_size;
+  // MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  // MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  // if (mpi_rank == mpi_size - 1) {
+  // while(1)
+  //   std::cout << "check value equivalence " << data_val << " " << diff_val << std::endl;
+  // }
+
+
   solver->SetActionFunction(signal_handler.GetActionFunction());
 
   if (FLAGS_snapshot.size()) {
