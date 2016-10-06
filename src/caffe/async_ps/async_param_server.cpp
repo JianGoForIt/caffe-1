@@ -38,27 +38,18 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         // there is only 1 part for each blob.
         // Start listening before the task is insert into the queue
         TaskRequest recv_task(root_rank, j, k, 0);
-
-        // start a new listening to wait for message from roots
-        MPI_Irecv(buf, blob_size, DtypeToMPIDtype<Dtype>(), root_rank,
-          recv_task.GetTag(), MPI_COMM_WORLD, &(recv_task.mpi_request_) );
-
         recv_tasks_.push_back(recv_task);
         rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(j, k) ) ] = 
           recv_tasks_.size() - 1;
-
-
-        // DEBUG
-        std::cout << "ckpt init recv done " << root_rank << " " << j << " " << k << " " << recv_tasks_.size() - 1 << std::endl;
-
-
+        // start a new listening to wait for message from roots
+        MPI_Irecv(buf, blob_size, DtypeToMPIDtype<Dtype>(), root_rank,
+          recv_task.GetTag(), MPI_COMM_WORLD, &(recv_tasks_[recv_tasks_.size() - 1].mpi_request_) );
       }
   }
 }
 
 
 // TODO Jian how to get the correct iter number potentially get the version and set iter before update
-
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessUpdateTask() {
   std::deque<TaskRequest> to_update;
@@ -92,12 +83,9 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     send_tasks_.push_back(task);
     send_queue_mutex_.unlock();
 
-
-            // DEBUG
-    LOG(INFO) << " push send task for " << task.root_rank_ 
-      << " " << task.layer_id_ << " " << task.blob_id_;
-
-
+    // // DEBUG
+    // LOG(INFO) << " push send task for " << task.root_rank_ 
+    //   << " " << task.layer_id_ << " " << task.blob_id_;
   }
 }
 
@@ -115,9 +103,8 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     int tag = to_send.front().GetTag();
     to_send.pop_front();
 
-    // DEBUG
-    LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
-
+    // // DEBUG
+    // LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
 
     std::pair<Dtype*, int64_t> buf = 
       buf_ptr_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
@@ -126,21 +113,14 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     // We do not need to care about the request. Because if the blocking recv
     // has not finished on root, it will not start a new send task
     MPI_Request dump_request;
-    // MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
-    //   tag, MPI_COMM_WORLD, &dump_request);
-    MPI_Send(ptr, 1, DtypeToMPIDtype<Dtype>(), root_rank, 
+    MPI_Send(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
       tag, MPI_COMM_WORLD);
     send_cnt_ += 1;
 
     // start a new listening to wait for message from roots
     int vec_pos = rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
-    // MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
-    //   tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
-    
-    MPI_Irecv(ptr, 1, DtypeToMPIDtype<Dtype>(), root_rank,
+    MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
       tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
-
-
   }
 }
 
@@ -149,21 +129,8 @@ template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessRecvTask() {
   int flag = 0;
   for (int i = 0; i < recv_tasks_.size(); i++) {
-    //  // DEBUG
-    // LOG(INFO) << " ckpt 0 process recv task for " << recv_tasks_[recv_tasks_iter_].root_rank_ 
-    //   << " " << recv_tasks_[recv_tasks_iter_].layer_id_ << " " << recv_tasks_[recv_tasks_iter_].blob_id_ << " " << flag;
-
     if (recv_tasks_[recv_tasks_iter_].mpi_request_ != MPI_REQUEST_NULL) {
-
       MPI_Test(&(recv_tasks_[recv_tasks_iter_].mpi_request_), &flag, MPI_STATUS_IGNORE);
-
-
-      //  // DEBUG
-      // LOG(INFO) << " ckpt 2 process recv task for " << recv_tasks_[recv_tasks_iter_].root_rank_ 
-      //   << " " << recv_tasks_[recv_tasks_iter_].layer_id_ << " " << recv_tasks_[recv_tasks_iter_].blob_id_ << " " << flag;
-
-
-
       if (flag) {
         // currently no need to lock the solver buffer, as comp thread
         // takes care of two copy operations.
