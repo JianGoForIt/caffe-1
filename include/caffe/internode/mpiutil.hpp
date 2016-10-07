@@ -7,6 +7,9 @@
 // Modified by Jian
 #include <mpi.h>
 
+// #ifndef MSG_ASYNC
+// #define MSG_ASYNC 
+
 // Modified by Jian
 // Compile time mapping from typename Dtype to MPI_Datatype
 template <typename Dtype>

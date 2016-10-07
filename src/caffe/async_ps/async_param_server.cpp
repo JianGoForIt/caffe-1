@@ -187,10 +187,11 @@ void AsyncParamServer<Dtype>::Run() {
   // spawn compute thread
   std::thread compute_thread(&AsyncParamServer<Dtype>::ComputeLoop, this);
   // spawn communication thread
-  std::thread comm_thread(&AsyncParamServer<Dtype>::CommLoop, this);
+  // std::thread comm_thread(&AsyncParamServer<Dtype>::CommLoop, this);
+  CommLoop();
 
   compute_thread.join();
-  comm_thread.join();
+  // comm_thread.join();
 }
 
 

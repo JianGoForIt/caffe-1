@@ -372,6 +372,10 @@ class SynchronousSync : public InternalThread
         MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
           param_server_rank, tag, MPI_COMM_WORLD);
 
+
+        assert(tag != 10);
+
+
         // // DEBUG
         // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
         //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
