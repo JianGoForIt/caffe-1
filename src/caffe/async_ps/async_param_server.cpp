@@ -134,7 +134,7 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     MPI_Request dump_request;
 
     // DEBUG
-    if (root_rank == 0) {
+    if (root_rank == 4) {
 
 
     MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
