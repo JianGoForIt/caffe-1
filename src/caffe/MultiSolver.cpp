@@ -59,8 +59,8 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
       // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
 
       Dtype val = 0.0;
-      for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
-        val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
+      for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+        val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
       }
 
 
