@@ -382,7 +382,7 @@ class SynchronousSync : public InternalThread
           val += blob->cpu_diff()[0];
           LOG(INFO) << "blob 12 0 sum " << val << " mpi rank " << mpi_rank;
 
-          // while(1);
+          while(1);
         }
 
 
@@ -421,7 +421,7 @@ class SynchronousSync : public InternalThread
       val += blob->cpu_diff()[0];
       LOG(INFO) << "blob 12 0 sum " << val << " mpi rank " << mpi_rank;
 
-      // while(1);
+      while(1);
     }
 
 
