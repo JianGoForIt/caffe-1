@@ -407,6 +407,11 @@ class SynchronousSync : public InternalThread
 
         // DEBUG
     if (layer_id == 12) {
+      int mpi_size;
+      int param_server_rank;
+      int mpi_rank;
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
       Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
       Dtype val = 0.0;
       for (int i = 0; i < blob->count(); i++) {
@@ -418,7 +423,7 @@ class SynchronousSync : public InternalThread
     }
 
 
-    
+
     layers.at(layer_id).wake_up();
   }
 
