@@ -380,6 +380,8 @@ class SynchronousSync : public InternalThread
             val += blob->cpu_diff()[i];
           }
           LOG(INFO) << "blob 12 0 sum " << val;
+
+          while(1);
         }
 
 
