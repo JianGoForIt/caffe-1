@@ -133,6 +133,9 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     // has not finished on root, it will not start a new send task
     MPI_Request dump_request;
 
+    if (root_rank == 0) {
+
+
     MPI_Isend(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank, 
       tag, MPI_COMM_WORLD, &dump_request);
     send_cnt_ += 1;
@@ -141,6 +144,7 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     int vec_pos = rank_layer_blob_to_vec_pos[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
     MPI_Irecv(ptr, count, DtypeToMPIDtype<Dtype>(), root_rank,
       tag, MPI_COMM_WORLD, &(recv_tasks_[vec_pos].mpi_request_) );
+    }
   }
 }
 
