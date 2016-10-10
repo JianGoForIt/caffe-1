@@ -118,10 +118,10 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   Dtype rate = GetLearningRate();
 
       // DEBUG
-  Blob<Dtype>* blob = this->net()->layers()[12]->blobs()[0];
+  // Blob<Dtype>* blob = ;
   Dtype val = 0.0;
   for (int i = 0; i < blob->count(); i++) {
-    val += blob->cpu_diff()[i];
+    val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
   }
   LOG(INFO) << "blob 12 0 sum " << val;
 
