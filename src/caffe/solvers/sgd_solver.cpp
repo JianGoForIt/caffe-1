@@ -117,6 +117,12 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   CHECK(Caffe::root_solver());
   Dtype rate = GetLearningRate();
 
+
+      // DEBUG
+      LOG(INFO) << "blob 12 0 check Learning rate " << rate;
+      while(1);
+
+
   Normalize(param_id);
   Regularize(param_id);
   ComputeUpdateValue(param_id, rate);
