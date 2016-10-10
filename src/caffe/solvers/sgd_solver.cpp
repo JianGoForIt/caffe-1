@@ -117,10 +117,16 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   CHECK(Caffe::root_solver());
   Dtype rate = GetLearningRate();
 
-
       // DEBUG
-      LOG(INFO) << "blob 12 0 check Learning rate " << rate;
-      while(1);
+  Blob<Dtype>* blob = solver->net()->layers()[12]->blobs()[0];
+  Dtype val = 0.0;
+  for (int i = 0; i < blob->count(); i++) {
+    val += blob->cpu_diff()[i];
+  }
+  LOG(INFO) << "blob 12 0 sum " << val;
+
+  LOG(INFO) << "blob 12 0 check Learning rate " << rate;
+  while(1);
 
 
   Normalize(param_id);
