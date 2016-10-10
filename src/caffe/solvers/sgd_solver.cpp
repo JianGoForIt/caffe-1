@@ -124,9 +124,12 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
       // DEBUG
   // Blob<Dtype>* blob = ;
   Dtype val = 0.0;
-  for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
-    val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
-  }
+  // for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
+  //   val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
+  // }
+
+      val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[0];
+
 
   int MPI_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);

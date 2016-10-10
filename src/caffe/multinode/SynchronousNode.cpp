@@ -376,9 +376,10 @@ class SynchronousSync : public InternalThread
         // DEBUG
         if (layer_id == 12 && blob_id == 0) {
           Dtype val = 0.0;
-          for (int i = 0; i < blob->count(); i++) {
-            val += blob->cpu_diff()[i];
-          }
+          // for (int i = 0; i < blob->count(); i++) {
+          //   val += blob->cpu_diff()[i];
+          // }
+          val += blob->cpu_diff()[0];
           LOG(INFO) << "blob 12 0 sum " << val << " mpi rank " << mpi_rank;
 
           // while(1);
@@ -414,9 +415,10 @@ class SynchronousSync : public InternalThread
       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
       Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
       Dtype val = 0.0;
-      for (int i = 0; i < blob->count(); i++) {
-        val += blob->cpu_diff()[i];
-      }
+      // for (int i = 0; i < blob->count(); i++) {
+      //   val += blob->cpu_diff()[i];
+      // }
+      val += blob->cpu_diff()[0];
       LOG(INFO) << "blob 12 0 sum " << val << " mpi rank " << mpi_rank;
 
       // while(1);
