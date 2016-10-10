@@ -7,6 +7,7 @@
 
 // Modified by Jian
 #include <iostream>
+#include <mpi.h>
 
 namespace caffe {
 
@@ -47,6 +48,28 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
       }
     }
     root_solver_->net()->BackwardFromTo(i, i);
+
+    // DEBUG
+    if (i == 12) {
+      int mpi_size;
+      int param_server_rank;
+      int mpi_rank;
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+      // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+      Dtype val = 0.0;
+      for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
+        val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
+      }
+
+
+      LOG(INFO) << "blob 12 0 generated " << val << " mpi rank " << mpi_rank;
+
+    }
+
+
+
     if (last) {
       for (int j = 0; j < callbacks_.size(); ++j) {
         callbacks_[j]->on_gradients_ready(i);
