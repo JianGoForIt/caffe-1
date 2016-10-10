@@ -123,7 +123,11 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
     val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
   }
-  LOG(INFO) << "blob 12 0 sum " << val;
+
+  int MPI_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
+
+  LOG(INFO) << "blob 12 0 sum " << val << " rank " << MPI_rank;
 
   LOG(INFO) << "blob 12 0 check Learning rate " << rate;
   while(1);
