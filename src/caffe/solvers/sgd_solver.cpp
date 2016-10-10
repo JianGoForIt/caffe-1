@@ -120,7 +120,7 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
       // DEBUG
   // Blob<Dtype>* blob = ;
   Dtype val = 0.0;
-  for (int i = 0; i < blob->count(); i++) {
+  for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
     val += this->net()->layers()[12]->blobs()[0]->cpu_diff()[i];
   }
   LOG(INFO) << "blob 12 0 sum " << val;
