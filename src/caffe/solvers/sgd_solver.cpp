@@ -134,7 +134,7 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   LOG(INFO) << "blob 12 0 sum " << val << " rank " << MPI_rank;
 
   LOG(INFO) << "blob 12 0 check Learning rate " << rate;
-  while(1);
+  // while(1);
 
 
   Normalize(param_id);

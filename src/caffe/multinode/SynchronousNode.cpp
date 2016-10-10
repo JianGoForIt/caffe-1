@@ -381,7 +381,7 @@ class SynchronousSync : public InternalThread
           }
           LOG(INFO) << "blob 12 0 sum " << val << " mpi rank " << mpi_rank;
 
-          while(1);
+          // while(1);
         }
 
 
