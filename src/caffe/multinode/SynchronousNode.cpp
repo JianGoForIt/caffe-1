@@ -355,54 +355,54 @@ class SynchronousSync : public InternalThread
       // if the node is root push the gradient 
       // we assign the last node to be the async server
       
-      // int mpi_size;
-      // int param_server_rank;
-      // int mpi_rank;
-      // MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-      // MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-      // param_server_rank = mpi_size - 1;
-      // // keychain->lock(layer_id);
-      // int n_blob = solver->net()->layers()[layer_id]->blobs().size();
-      // for (int blob_id = 0; blob_id < n_blob; blob_id++) {
-      //   Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
-      //   async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
-      //   MPI_Status dump_status;
-      //   int tag = task.GetTag();
+      int mpi_size;
+      int param_server_rank;
+      int mpi_rank;
+      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+      param_server_rank = mpi_size - 1;
+      // keychain->lock(layer_id);
+      int n_blob = solver->net()->layers()[layer_id]->blobs().size();
+      for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+        Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+        async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+        MPI_Status dump_status;
+        int tag = task.GetTag();
 
-      //   // // DEBUG
-      //   // LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
-      //   //   << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
+        // // DEBUG
+        // LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
+        //   << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
 
-      //   MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
-      //     param_server_rank, tag, MPI_COMM_WORLD);
-
-
-      //   // DEBUG
-      //   if (layer_id == 12 && blob_id == 0) {
-      //     Dtype val = 0.0;
-      //     // for (int i = 0; i < blob->count(); i++) {
-      //     //   val += blob->cpu_diff()[i];
-      //     // }
-      //     val += blob->cpu_diff()[0];
-      //     LOG(INFO) << "blob 12 0 send " << val << " mpi rank " << mpi_rank;
-
-      //     while(1);
-      //   }
+        MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
+          param_server_rank, tag, MPI_COMM_WORLD);
 
 
+        // // DEBUG
+        // if (layer_id == 12 && blob_id == 0) {
+        //   Dtype val = 0.0;
+        //   // for (int i = 0; i < blob->count(); i++) {
+        //   //   val += blob->cpu_diff()[i];
+        //   // }
+        //   val += blob->cpu_diff()[0];
+        //   LOG(INFO) << "blob 12 0 send " << val << " mpi rank " << mpi_rank;
 
-      //   // // DEBUG
-      //   // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
-      //   //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
+        //   while(1);
+        // }
 
 
-      //   MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
-      //    param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+
+        // // DEBUG
+        // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
+        //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
+
+
+        MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+         param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
         
-      //   // // DEBUG
-      //   // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
-      //   //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
-      // }
+        // // DEBUG
+        // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
+        //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
+      }
 
       // keychain->unlock(layer_id);
       boost::mutex::scoped_lock lock(mtx);
