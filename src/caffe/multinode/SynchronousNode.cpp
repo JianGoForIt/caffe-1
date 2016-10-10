@@ -398,6 +398,23 @@ class SynchronousSync : public InternalThread
         // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
         //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
       }
+
+
+      // DEBUG
+      if (layer_id == 12) {
+        Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+        Dtype val = 0.0;
+        for (int i = 0; i < blob->count(); i++) {
+          val += blob->cpu_diff()[i];
+        }
+        LOG(INFO) << "blob 12 0 sum " << val << " mpi rank " << mpi_rank;
+
+        // while(1);
+      }
+
+
+
+
       // keychain->unlock(layer_id);
       boost::mutex::scoped_lock lock(mtx);
       layers_to_update.push_back(make_pair(layer_id, version));
