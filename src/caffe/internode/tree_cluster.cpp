@@ -295,7 +295,8 @@ class MpiTreeClient : public TreeWaypoint {
     int group_size = (count - 1) / nGroup;
     int group_id = current / group_size;
 
-    if (current % group_size == 0) {
+
+    if (current % group_size == 0 && group_size != 1) {
 
       // // DEBUG
       // std::cout << "ckpt parent: current " << current << " parent " << current << std::endl;
