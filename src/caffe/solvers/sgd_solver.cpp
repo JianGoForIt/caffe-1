@@ -6,6 +6,10 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
 
+// Modified by Jian
+#include <mpi.h>
+
+
 namespace caffe {
 
 // Return the current learning rate. The currently implemented learning rate
