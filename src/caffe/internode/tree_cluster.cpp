@@ -298,8 +298,8 @@ class MpiTreeClient : public TreeWaypoint {
 
     if (current % group_size == 0 && group_size != 1) {
 
-      // DEBUG
-      std::cout << "ckpt parent: current " << current << " parent " << current << std::endl;
+      // // DEBUG
+      // std::cout << "ckpt parent: current " << current << " parent " << current << std::endl;
 
       return current;
     }
@@ -307,8 +307,8 @@ class MpiTreeClient : public TreeWaypoint {
       int offset = group_id * group_size;
       int residual = current - offset;
 
-      // DEBUG
-      std::cout << "ckpt parent: current " << current << " parent " << floor( (residual - 1) / 2 ) + offset << std::endl;
+      // // DEBUG
+      // std::cout << "ckpt parent: current " << current << " parent " << floor( (residual - 1) / 2 ) + offset << std::endl;
 
       return floor( (residual - 1) / 2 ) + offset;
     }

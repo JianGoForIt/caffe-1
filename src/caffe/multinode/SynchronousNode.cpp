@@ -30,6 +30,9 @@
 #include "caffe/async_ps/async_param_server.hpp"
 #include <sys/types.h>
 #include <unistd.h>
+#include <mpi.h>
+
+
 
 namespace caffe {
 
@@ -406,23 +409,23 @@ class SynchronousSync : public InternalThread
     }
 
 
-        // DEBUG
-    if (layer_id == 12) {
-      int mpi_size;
-      int param_server_rank;
-      int mpi_rank;
-      MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-      MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-      Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
-      Dtype val = 0.0;
-      // for (int i = 0; i < blob->count(); i++) {
-      //   val += blob->cpu_diff()[i];
-      // }
-      val += blob->cpu_diff()[0];
-      LOG(INFO) << "blob 12 0 send " << val << " mpi rank " << mpi_rank;
+    //     // DEBUG
+    // if (layer_id == 12) {
+    //   int mpi_size;
+    //   int param_server_rank;
+    //   int mpi_rank;
+    //   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    //   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    //   Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+    //   Dtype val = 0.0;
+    //   // for (int i = 0; i < blob->count(); i++) {
+    //   //   val += blob->cpu_diff()[i];
+    //   // }
+    //   val += blob->cpu_diff()[0];
+    //   LOG(INFO) << "blob 12 0 send " << val << " mpi rank " << mpi_rank;
 
-      while(1);
-    }
+    //   while(1);
+    // }
 
 
 
