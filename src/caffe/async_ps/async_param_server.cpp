@@ -83,6 +83,13 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
 
     solver_->set_iter(blob_wise_iter);
     int param_id = solver_->net()->get_layer_learnable_param_ids(task.layer_id_)[task.blob_id_];
+    
+    if (task.layer_id_ == 12 && task.blob_id_ == 0) {
+      // DEBUG
+      LOG(INFO) << "blob 12 0 check Learning rate " << solver_->GetLearningRate();
+      while(1);
+    }
+
     solver_->ApplyUpdate(param_id);
 
 

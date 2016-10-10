@@ -373,7 +373,15 @@ class SynchronousSync : public InternalThread
           param_server_rank, tag, MPI_COMM_WORLD);
 
 
-        assert(tag != 10);
+        // DEBUG
+        if (layer_id == 12 && blob_id == 0) {
+          Dtype val = 0.0;
+          for (int i = 0; i < blob->count(); i++) {
+            val += blob->cpu_diff()[i];
+          }
+          LOG(INFO) << "blob 12 0 sum " << val;
+        }
+
 
 
         // // DEBUG
