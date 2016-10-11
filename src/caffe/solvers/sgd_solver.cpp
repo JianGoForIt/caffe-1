@@ -121,7 +121,7 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   CHECK(Caffe::root_solver());
   Dtype rate = GetLearningRate();
 
-      // DEBUG
+  //     // DEBUG
   // // Blob<Dtype>* blob = ;
   // Dtype val = 0.0;
   // // for (int i = 0; i < this->net()->layers()[12]->blobs()[0]->count(); i++) {
@@ -137,7 +137,7 @@ void SGDSolver<Dtype>::ApplyUpdate(int param_id) {
   // LOG(INFO) << "blob 12 0 sum " << val << " rank " << MPI_rank;
 
   // LOG(INFO) << "blob 12 0 check Learning rate " << rate;
-  // // while(1);
+  // while(1);
 
 
   Normalize(param_id);

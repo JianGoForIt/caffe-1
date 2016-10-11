@@ -361,7 +361,7 @@ class SynchronousSync : public InternalThread
       MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
       param_server_rank = mpi_size - 1;
-      // keychain->lock(layer_id);
+      boost::mutex::scoped_lock lock(mtx);
       int n_blob = solver->net()->layers()[layer_id]->blobs().size();
       for (int blob_id = 0; blob_id < n_blob; blob_id++) {
         Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
@@ -369,9 +369,9 @@ class SynchronousSync : public InternalThread
         MPI_Status dump_status;
         int tag = task.GetTag();
 
-        // // DEBUG
-        // LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
-        //   << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
+      //   // // DEBUG
+      //   // LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
+      //   //   << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
 
         MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
           param_server_rank, tag, MPI_COMM_WORLD);
@@ -391,21 +391,20 @@ class SynchronousSync : public InternalThread
 
 
 
-        // // DEBUG
-        // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
-        //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
+      //   // // DEBUG
+      //   // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
+      //   //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
 
 
         MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
          param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
         
-        // // DEBUG
-        // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
-        //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
+      //   // // DEBUG
+      //   // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
+      //   //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
       }
 
-      // keychain->unlock(layer_id);
-      boost::mutex::scoped_lock lock(mtx);
+      // boost::mutex::scoped_lock lock(mtx);
       layers_to_update.push_back(make_pair(layer_id, version));
     }
 
@@ -532,9 +531,9 @@ class SynchronousSync : public InternalThread
 
 
     // Modified by Jian
-    // for (int i = 0; i < param_ids.size(); ++i) {
-    //   solver->ApplyUpdate(param_ids[i]);
-    // }
+    for (int i = 0; i < param_ids.size(); ++i) {
+      solver->ApplyUpdate(param_ids[i]);
+    }
     // end of modification
 
 
