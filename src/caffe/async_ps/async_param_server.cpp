@@ -109,9 +109,9 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     send_tasks_.push_back(task);
     send_queue_mutex_.unlock();
 
-    // // DEBUG
-    // LOG(INFO) << " push send task for " << task.root_rank_ 
-    //   << " " << task.layer_id_ << " " << task.blob_id_;
+    // DEBUG
+    LOG(INFO) << " push send task for " << task.root_rank_ 
+      << " " << task.layer_id_ << " " << task.blob_id_;
   }
 }
 
@@ -129,8 +129,8 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     int tag = to_send.front().GetTag();
     to_send.pop_front();
 
-    // // DEBUG
-    // LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
+    // DEBUG
+    LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
 
     std::pair<Dtype*, int64_t> buf = 
       send_buf_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];

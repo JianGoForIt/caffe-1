@@ -28,8 +28,8 @@
 
 // Modified by Jian
 #include "caffe/async_ps/async_param_server.hpp"
-#include <sys/types.h>
-#include <unistd.h>
+// #include <sys/types.h>
+// #include <unistd.h>
 #include <mpi.h>
 
 
@@ -354,6 +354,7 @@ class SynchronousSync : public InternalThread
       // Modified by Jian
       // if the node is root push the gradient 
       // we assign the last node to be the async server
+	    boost::mutex::scoped_lock lock(mtx);
       
       int mpi_size;
       int param_server_rank;
@@ -361,7 +362,6 @@ class SynchronousSync : public InternalThread
       MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
       param_server_rank = mpi_size - 1;
-      boost::mutex::scoped_lock lock(mtx);
       int n_blob = solver->net()->layers()[layer_id]->blobs().size();
       for (int blob_id = 0; blob_id < n_blob; blob_id++) {
         Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
@@ -369,68 +369,125 @@ class SynchronousSync : public InternalThread
         MPI_Status dump_status;
         int tag = task.GetTag();
 
-      //   // // DEBUG
-      //   // LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
-      //   //   << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
-
         MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
           param_server_rank, tag, MPI_COMM_WORLD);
 
 
-        // // DEBUG
-        // if (layer_id == 12 && blob_id == 0) {
-        //   Dtype val = 0.0;
-        //   // for (int i = 0; i < blob->count(); i++) {
-        //   //   val += blob->cpu_diff()[i];
-        //   // }
-        //   val += blob->cpu_diff()[0];
-        //   LOG(INFO) << "blob 12 0 send " << val << " mpi rank " << mpi_rank;
-
-        //   while(1);
-        // }
-
-
-
-      //   // // DEBUG
-      //   // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
-      //   //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
-
-
-        MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
-         param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
-        
-      //   // // DEBUG
-      //   // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
-      //   //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
-      }
-
-      // boost::mutex::scoped_lock lock(mtx);
-      layers_to_update.push_back(make_pair(layer_id, version));
-    }
-
-
-    //     // DEBUG
-    // if (layer_id == 12) {
+    //         // DEBUG
+    // if (layer_id == 12 && blob_id == 0) {
     //   int mpi_size;
     //   int param_server_rank;
     //   int mpi_rank;
     //   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     //   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    //   Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
-    //   Dtype val = 0.0;
-    //   // for (int i = 0; i < blob->count(); i++) {
-    //   //   val += blob->cpu_diff()[i];
-    //   // }
-    //   val += blob->cpu_diff()[0];
-    //   LOG(INFO) << "blob 12 0 send " << val << " mpi rank " << mpi_rank;
+    //   // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
 
-    //   while(1);
+    //   Dtype val = 0.0;
+    //   // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+    //     // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+    //     val += solver->net()->layers()[12]->blobs()[0]->cpu_diff()[0];
+    //   // }
+
+
+    //   LOG(INFO) << "blob 12 0 gather " << val << " mpi rank " << mpi_rank;
+      
+
     // }
 
 
+        MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+         param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+        
+      }
+
+      // boost::mutex::scoped_lock lock(mtx);
+      layers_to_update.push_back(make_pair(layer_id, version));
+    }
+  //   else {
+  //             boost::mutex::scoped_lock lock(mtx);
+  //       // DEBUG
+  //   if (layer_id == 12) {
+  //     int mpi_size;
+  //     int param_server_rank;
+  //     int mpi_rank;
+  //     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  //     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  //     // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+  //     Dtype val = 0.0;
+  //     // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+  //       // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+  //       val += solver->net()->layers()[12]->blobs()[0]->cpu_diff()[0];
+  //     // }
+
+
+  //     LOG(INFO) << "blob 12 0 gather " << val << " mpi rank " << mpi_rank;
+
+
+  //   }
+  // }
 
     layers.at(layer_id).wake_up();
   }
+  
+
+//  virtual void synced_gradients(int layer_id, uint32_t version) {
+//     CVLOG(2) << "layer " << layer_id
+//                << " gradients are in synced with version " << version;
+//     if (is_root()) {
+//       boost::mutex::scoped_lock lock(mtx);
+
+
+//     // DEBUG
+//     if (layer_id == 12) {
+//       int mpi_size;
+//       int param_server_rank;
+//       int mpi_rank;
+//       MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+//       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+//       // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+//       Dtype val = 0.0;
+//       // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+//         // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+//         val += solver->net()->layers()[12]->blobs()[0]->cpu_diff()[0];
+//       // }
+
+
+//       LOG(INFO) << "blob 12 0 gather " << val << " mpi rank " << mpi_rank;
+
+//     }
+
+
+//     layers_to_update.push_back(make_pair(layer_id, version));
+//     }
+//     else {
+//         boost::mutex::scoped_lock lock(mtx);
+//         // DEBUG
+//     if (layer_id == 12) {
+//       int mpi_size;
+//       int param_server_rank;
+//       int mpi_rank;
+//       MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+//       MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+//       // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+//       Dtype val = 0.0;
+//       // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+//         // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+//         val += solver->net()->layers()[12]->blobs()[0]->cpu_diff()[0];
+//       // }
+
+
+//       LOG(INFO) << "blob 12 0 gather " << val << " mpi rank " << mpi_rank;
+
+//     }
+// }
+//     layers.at(layer_id).wake_up();
+//   }
+
+
+
 
   virtual void synced_gradients(uint32_t version) {
     CVLOG(2) << "net gradients are synced with version: " << version;
@@ -530,11 +587,74 @@ class SynchronousSync : public InternalThread
       solver->net()->get_layer_learnable_param_ids(layer_id);
 
 
-    // Modified by Jian
-    for (int i = 0; i < param_ids.size(); ++i) {
-      solver->ApplyUpdate(param_ids[i]);
-    }
-    // end of modification
+    // // // Modified by Jian
+    // // for (int i = 0; i < param_ids.size(); ++i) {
+    // //   solver->ApplyUpdate(param_ids[i]);
+    // // }
+    // // // end of modification
+    
+
+    // int mpi_size;
+    // int param_server_rank;
+    // int mpi_rank;
+    // MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    // MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    // param_server_rank = mpi_size - 1;
+    // int n_blob = solver->net()->layers()[layer_id]->blobs().size();
+    // for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+    //     Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+    //     async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+    //     MPI_Status dump_status;
+    //     int tag = task.GetTag();
+
+    //     // // DEBUG
+    //     // LOG(INFO) << " send on root START " << mpi_rank << " " << layer_id 
+    //     //   << " " << blob_id << " " << solver->iter() << " thread id " << boost::this_thread::get_id() << " proc " << ::getpid();
+
+    //     // MPI_Send(blob->mutable_cpu_diff(), blob->count(), DtypeToMPIDtype<Dtype>(), 
+    //     //   param_server_rank, tag, MPI_COMM_WORLD);
+
+
+    // //         // DEBUG
+    // // if (layer_id == 12 && blob_id == 0) {
+    // //   int mpi_size;
+    // //   int param_server_rank;
+    // //   int mpi_rank;
+    // //   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    // //   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    // //   // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+    // //   Dtype val = 0.0;
+    // //   // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+    // //     // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+    // //     val += solver->net()->layers()[12]->blobs()[0]->cpu_diff()[0];
+    // //   // }
+
+
+    // //   LOG(INFO) << "blob 12 0 gather " << val << " mpi rank " << mpi_rank;
+      
+
+    // // }
+
+
+
+
+    //   //   // // DEBUG
+    //   //   // LOG(INFO) << " send on root done " << mpi_rank << " " << layer_id 
+    //   //   //   << " " << blob_id << " " << tag << " " << param_server_rank << " " << tmp[0];
+
+
+    //     MPI_Recv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+    //      param_server_rank, tag, MPI_COMM_WORLD, &dump_status);
+        
+    //   //   // // DEBUG
+    //   //   // LOG(INFO) << " recv on root done " << mpi_rank << " " << layer_id 
+    //   //   //   << " " << blob_id << " " << tag << param_server_rank << tmp[0];
+    //   }
+
+
+
+
 
 
     for (int j = 0; j < param_ids.size(); ++j)

@@ -76,6 +76,8 @@ DEFINE_bool(forward_only, false,
 // Modified by Jian
 DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
     " we want in the async forest");
+DEFINE_string(param_server_solver, "",
+    "The dummy solver file with dummy data (do not connect to data server if used)");
 
 
 // A simple registry for caffe commands.
@@ -199,6 +201,21 @@ caffe::SolverAction::Enum GetRequestedAction(
   LOG(FATAL) << "Invalid signal effect \""<< flag_value << "\" was specified";
 }
 
+
+// Modified by Jian
+bool IsParameterServer() {
+  // Modified by Jian
+  int mpi_rank;
+  int mpi_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  if (mpi_rank == mpi_size - 1)
+    return true;
+  else
+    return false;
+}
+
+
 // Train / Finetune a model.
 int train() {
   CHECK_GT(FLAGS_solver.size(), 0) << "Need a solver definition to train.";
@@ -208,7 +225,11 @@ int train() {
   vector<string> stages = get_stages_from_flags();
 
   caffe::SolverParameter solver_param;
-  caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
+
+  // if (IsParameterServer() )
+  //   caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_param_server_solver, &solver_param);
+  // else
+    caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
 
   solver_param.mutable_train_state()->set_level(FLAGS_level);
   for (int i = 0; i < stages.size(); i++) {
@@ -254,7 +275,7 @@ int train() {
   caffe::SignalHandler signal_handler(
         GetRequestedAction(FLAGS_sigint_effect),
         GetRequestedAction(FLAGS_sighup_effect));
-
+  
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
 
@@ -297,15 +318,10 @@ int train() {
       return 1;
     }
 
-    // Modified by Jian
-    // this is a global variable
-    int mpi_rank;
-    int mpi_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     caffe::internode::nGroup = FLAGS_n_group;
-    if (mpi_rank == mpi_size - 1) {
+    if (IsParameterServer() ) {
       caffe::async_param_server::AsyncParamServer<float> param_server(solver); 
+      LOG(INFO) << "Starting parameter server in mpi environment";
       MPI_Barrier(MPI_COMM_WORLD);
       param_server.Run();
     }
@@ -324,6 +340,7 @@ int train() {
     solver->Solve();
   }
   LOG(INFO) << "Optimization Done.";
+
   return 0;
 }
 RegisterBrewFunction(train);
