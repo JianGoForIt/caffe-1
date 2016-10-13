@@ -28,8 +28,6 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
     for (int j = 0; j < solver_->net()->layers().size(); j++)
       for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
         int64_t blob_size = solver_->net()->layers()[j]->blobs()[k]->count();
-        // buf_ptr_.insert(make_pair(make_pair(root_rank, 
-        //   make_pair(j, k) ), make_pair(NULL, 0) ) );
         Dtype* buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
         recv_buf_[make_pair(root_rank, make_pair(j, k) ) ] = 
           make_pair(buf, blob_size);
