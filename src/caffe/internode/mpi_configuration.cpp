@@ -82,6 +82,16 @@ class MpiClient : public Waypoint {
             MPI_ANY_TAG,
             MPI_COMM_WORLD,
             &requests.back().first);
+    
+    // // Modified by Jian
+    // MPI_Irecv(
+    //         &buffer.front(),
+    //         buffer.size(),
+    //         MPI_CHAR,
+    //         MPI_ANY_SOURCE,
+    //         MSG_TAG,
+    //         MPI_COMM_WORLD,
+    //         &requests.back().first);         
   }
 
   void received(bool ok, int size, int sender) {
@@ -249,6 +259,15 @@ class MpiServer : public MultiWaypoint {
               MPI_ANY_TAG,
               MPI_COMM_WORLD,
               &requests.back().first);
+    
+    // // Modified by Jian
+    // MPI_Irecv(&buffer.front(),
+    //           buffer.size(),
+    //           MPI_CHAR,
+    //           MPI_ANY_SOURCE,
+    //           MSG_TAG,
+    //           MPI_COMM_WORLD,
+    //           &requests.back().first);  
   }
 
   void received(bool ok, int size, int sender) {

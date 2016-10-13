@@ -226,9 +226,9 @@ int train() {
 
   caffe::SolverParameter solver_param;
 
-  // if (IsParameterServer() )
-  //   caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_param_server_solver, &solver_param);
-  // else
+  if (IsParameterServer() )
+    caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_param_server_solver, &solver_param);
+  else
     caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
 
   solver_param.mutable_train_state()->set_level(FLAGS_level);

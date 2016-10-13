@@ -55,6 +55,10 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         async_iter_[make_pair(i, j) ] = solver_->iter();
       }
   }
+
+  // for normalizing the gradient with the number of workers
+  int single_worker_iter_size = solver_->param().iter_size();
+  solver_->param().set_iter_size(single_worker_iter_size * (mpi_size - 1) );
 }
 
 
@@ -83,15 +87,8 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
 
     solver_->set_iter(blob_wise_iter);
     int param_id = solver_->net()->get_layer_learnable_param_ids(task.layer_id_)[task.blob_id_];
-    
-    // if (task.layer_id_ == 12 && task.blob_id_ == 0) {
-    //   // DEBUG
-    //   LOG(INFO) << "blob 12 0 check Learning rate " << solver_->GetLearningRate();
-    //   while(1);
-    // }
 
     solver_->ApplyUpdate(param_id);
-
 
     // // DEBUG
     // LOG(INFO) << "UPDATE root rank " << task.root_rank_ << " layer " << task.layer_id_ << " blob " << task.blob_id_;
@@ -109,9 +106,9 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     send_tasks_.push_back(task);
     send_queue_mutex_.unlock();
 
-    // DEBUG
-    LOG(INFO) << " push send task for " << task.root_rank_ 
-      << " " << task.layer_id_ << " " << task.blob_id_;
+    // // DEBUG
+    // LOG(INFO) << " push send task for " << task.root_rank_ 
+    //   << " " << task.layer_id_ << " " << task.blob_id_;
   }
 }
 
@@ -129,8 +126,8 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     int tag = to_send.front().GetTag();
     to_send.pop_front();
 
-    // DEBUG
-    LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
+    // // DEBUG
+    // LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
 
     std::pair<Dtype*, int64_t> buf = 
       send_buf_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];

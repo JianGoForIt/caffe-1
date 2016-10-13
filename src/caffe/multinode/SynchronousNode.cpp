@@ -586,13 +586,57 @@ class SynchronousSync : public InternalThread
     vector<int> param_ids =
       solver->net()->get_layer_learnable_param_ids(layer_id);
 
-
     // // // Modified by Jian
     // // for (int i = 0; i < param_ids.size(); ++i) {
     // //   solver->ApplyUpdate(param_ids[i]);
     // // }
     // // // end of modification
-    
+     
+    // // DEBUG
+    // if (1) {
+    //   int mpi_size;
+    //   int param_server_rank;
+    //   int mpi_rank;
+    //   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    //   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    //   // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+    //   Dtype val = 0.0;
+    //   for (int i = 0; i < solver->net()->layers()[layer_id]->blobs().size(); i++) {
+    //     // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+    //       // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+    //       val = solver->net()->layers()[layer_id]->blobs()[i]->cpu_diff()[0];
+    //     // }
+
+
+    //     LOG(INFO) << "blob " << layer_id << " " << i << " before diff " << val << " mpi rank " << mpi_rank;
+    //   }
+
+    // }
+
+    // // DEBUG
+    // if (1) {
+    //   int mpi_size;
+    //   int param_server_rank;
+    //   int mpi_rank;
+    //   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    //   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    //   // Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, 0);
+
+    //   Dtype val = 0.0;
+    //   for (int i = 0; i < solver->net()->layers()[layer_id]->blobs().size(); i++) {
+    //     // for (int i = 0; i < this->net().layers()[12]->blobs()[0]->count(); i++) {
+    //       // val += this->net().layers()[12]->blobs()[0]->cpu_diff()[i];
+    //       val = solver->net()->layers()[layer_id]->blobs()[i]->cpu_data()[0];
+    //     // }
+
+
+    //     LOG(INFO) << "blob " << layer_id << " " << i << " after data " << val << " mpi rank " << mpi_rank;
+    //   }
+
+    // }
+
+
 
     // int mpi_size;
     // int param_server_rank;
