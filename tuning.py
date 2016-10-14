@@ -20,19 +20,17 @@ base_dir = 'experiment/cifar10'
 
 experiment_name = 'tuning'
 
-n_workers = 4
+n_workers = 8
 
-all_n_groups = [1, 2, 4]
+all_n_groups = [1, 2, 4, 8]
 
-all_base_lr = [0.0001, 0.001, 0.01] 
-all_base_lr = [0.0001, 0.001] 
+all_base_lr = [0.0001, 0.0003, 0.001] 
 
 all_momentum = [0.0, 0.3, 0.6, 0.9]
-all_momentum = [0.0, 0.9]
 
-time_out = 60
+time_out = 600
 
-group_batch_size = 100
+group_batch_size = 128
 
 ##################
 
@@ -193,7 +191,7 @@ def create_train_test_worker_file(input_network_file_name, output_network_file_n
 
 
 if __name__ == "__main__":
-    exp_name_date = experiment_name + '_' + time.strftime("%Y-%m-%d-%H:%M", time.localtime())
+    exp_name_date = experiment_name + '_W' + str(n_workers) + '_' + time.strftime("%Y-%m-%d-%H:%M", time.localtime())
     for base_lr in all_base_lr:
         for n_groups in all_n_groups:
             worker_batch_size =  n_groups * (group_batch_size / n_workers)
