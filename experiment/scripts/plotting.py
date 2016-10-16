@@ -27,7 +27,7 @@ def moving_average(signal, window_size=50):
 
 def get_times_losses(all_lines):
     dt0 = all_lines[0][0]
-    all_seconds = [(line[0]-dt0).total_seconds() for line in all_lines]
+    all_seconds = [(line[0]-dt0).total_seconds() % 86400 for line in all_lines]
     all_losses = [line[3] for line in all_lines]
     return all_seconds, all_losses
 
