@@ -91,9 +91,9 @@ private:
   // for communication
   // // protector for blob on the solver
   // std::map<std::pair<int, int>, boost::mutex> solver_blob_mutex_;
-  std::deque<TaskRequest> update_tasks_;
+  std::map<int, std::deque<TaskRequest> > update_tasks_;
   std::deque<TaskRequest> send_tasks_;
-  boost::mutex update_queue_mutex_;
+  std::map<int, boost::mutex> update_queue_mutex_;
   boost::mutex send_queue_mutex_;
   int recv_tasks_iter_;
   std::vector<TaskRequest> recv_tasks_;
@@ -115,6 +115,9 @@ private:
 
   // iter for different blobs
   std::map<std::pair<int, int>, int64_t> async_iter_;
+
+  // total number of blobs which need updates
+  int n_blob_to_update_;
 };
 
 } // end of namespace async_param_server

@@ -18,13 +18,14 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
   solver_(solver),
   blob_accessor_(BlobInfoFactory<Dtype>::create_blob_accessor(solver) ),
   const_info_(BlobInfoFactory<Dtype>::create_const_info(solver, LONG_MAX) ), 
-  send_cnt_(0), update_cnt_(0) {
+  send_cnt_(0), update_cnt_(0), n_blob_total_(0) {
 
   // setup the mpi buffers and recv task vector
   int mpi_size;
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
   for (int i = 0; i < caffe::internode::nGroup; i++) {
-    int root_rank = mpi_size / caffe::internode::nGroup * i;
+    // note the last rank is the the server itself
+    int root_rank = (mpi_size - 1) / caffe::internode::nGroup * i;
     for (int j = 0; j < solver_->net()->layers().size(); j++)
       for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
         int64_t blob_size = solver_->net()->layers()[j]->blobs()[k]->count();
@@ -52,7 +53,12 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         // setup iter
         async_iter_[make_pair(i, j) ] = solver_->iter();
       }
+    // initialize the map of task queues and lock
+    update_tasks_[root_rank] = std::deque<TaskRequest> ();
+    update_queue_mutex_[root_rank] = boost::mutex ();
   }
+
+  n_blob_to_update_ = recv_tasks_.size() / caffe::internode::nGroup;
 
   // for normalizing the gradient with the number of workers
   int single_worker_iter_size = solver_->param().iter_size();
@@ -64,9 +70,19 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessUpdateTask() {
   std::deque<TaskRequest> to_update;
-  update_queue_mutex_.lock();
-  to_update.swap(update_tasks_);
-  update_queue_mutex_.unlock();
+  int mpi_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  for (int i = 0; i < caffe::internode::nGroup; i++) {
+    // judge we are ready to update a whole model
+    int root_rank = (mpi_size - 1) / caffe::internode::nGroup * i;
+    update_queue_mutex_[root_rank].lock();
+    if (update_tasks_[root_rank].size() == n_blob_to_update_) {
+      to_update.swap(update_tasks_[root_rank] );
+      update_queue_mutex_[root_rank].unlock();
+      break;
+    }
+    update_queue_mutex_[root_rank].unlock();
+  }
   while (!to_update.empty() ) {
     TaskRequest task = to_update.front();
     to_update.pop_front();
@@ -157,9 +173,10 @@ void AsyncParamServer<Dtype>::ProcessRecvTask() {
       if (flag) {
         // currently no need to lock the solver buffer, as comp thread
         // takes care of two copy operations.
-        update_queue_mutex_.lock();
-        update_tasks_.push_back(recv_tasks_[recv_tasks_iter_] );
-        update_queue_mutex_.unlock();
+        int root_rank = recv_tasks_[recv_tasks_iter_].root_task_;
+        update_queue_mutex_[root_rank].lock();
+        update_tasks_[root_rank].push_back(recv_tasks_[recv_tasks_iter_] );
+        update_queue_mutex_[root_rank].unlock();
       }
     }
     recv_tasks_iter_ = (recv_tasks_iter_ + 1) % recv_tasks_.size();
