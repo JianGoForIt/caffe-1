@@ -43,6 +43,11 @@ struct TaskRequest {
   }
 };
 
+struct TaskQueue {
+  boost::mutex queue_mutex_;
+  std::deque<TaskRequest> queue_;
+};
+
 
 // protocol:
 // when get a non-blocking mpi receive, comm thread submit a job to the 
@@ -67,6 +72,7 @@ public:
           std::free(recv_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
         }
     }
+    delete[] update_tasks_;
   };
   // in the update task, the compute thread 
   // 0. lock the mutex on blob
@@ -87,13 +93,25 @@ public:
   void CommLoop();
   void Run();
 
+  // some access function
+  int IdToRootRank(int root_id) { 
+    int mpi_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size); 
+    return (mpi_size - 1) / caffe::internode::nGroup * root_id;
+  }
+  int RootRankToId(int root_rank) { 
+    int mpi_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size); 
+    return root_rank / ( (mpi_size - 1) / caffe::internode::nGroup);
+  }
+
 private:
   // for communication
   // // protector for blob on the solver
   // std::map<std::pair<int, int>, boost::mutex> solver_blob_mutex_;
-  std::map<int, std::deque<TaskRequest> > update_tasks_;
+  // std::vector<TaskQueue> update_tasks_;
+  TaskQueue* update_tasks_;
   std::deque<TaskRequest> send_tasks_;
-  std::map<int, boost::mutex> update_queue_mutex_;
   boost::mutex send_queue_mutex_;
   int recv_tasks_iter_;
   std::vector<TaskRequest> recv_tasks_;
@@ -118,6 +136,12 @@ private:
 
   // total number of blobs which need updates
   int n_blob_to_update_;
+  // this is bundled with the update_tasks_ queue, they use the same
+  // mutex lock
+  int n_blob_current_root_;
+  // this indicates the rank of the root current being updated.
+  // it is the index of the root not the actual mpi rank
+  int current_root_id_;
 };
 
 } // end of namespace async_param_server

@@ -18,7 +18,8 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
   solver_(solver),
   blob_accessor_(BlobInfoFactory<Dtype>::create_blob_accessor(solver) ),
   const_info_(BlobInfoFactory<Dtype>::create_const_info(solver, LONG_MAX) ), 
-  send_cnt_(0), update_cnt_(0), n_blob_total_(0) {
+  send_cnt_(0), update_cnt_(0), n_blob_to_update_(0), 
+  n_blob_current_root_(0), current_root_id_(0) {
 
   // setup the mpi buffers and recv task vector
   int mpi_size;
@@ -53,10 +54,12 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         // setup iter
         async_iter_[make_pair(i, j) ] = solver_->iter();
       }
-    // initialize the map of task queues and lock
-    update_tasks_[root_rank] = std::deque<TaskRequest> ();
-    update_queue_mutex_[root_rank] = boost::mutex ();
   }
+  
+  // initialize the array of task queues and lock
+  // update_tasks_.insert(update_tasks_.begin(), caffe::internode::nGroup, TaskQueue () );
+  update_tasks_ = new TaskQueue[caffe::internode::nGroup];
+
 
   n_blob_to_update_ = recv_tasks_.size() / caffe::internode::nGroup;
 
@@ -70,19 +73,24 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessUpdateTask() {
   std::deque<TaskRequest> to_update;
-  int mpi_size;
-  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-  for (int i = 0; i < caffe::internode::nGroup; i++) {
-    // judge we are ready to update a whole model
-    int root_rank = (mpi_size - 1) / caffe::internode::nGroup * i;
-    update_queue_mutex_[root_rank].lock();
-    if (update_tasks_[root_rank].size() == n_blob_to_update_) {
-      to_update.swap(update_tasks_[root_rank] );
-      update_queue_mutex_[root_rank].unlock();
-      break;
+  if (n_blob_current_root_ == 0) {
+    for (int i = 0; i < caffe::internode::nGroup; i++) {
+      int queue_size = 0;
+      update_tasks_[current_root_id_].queue_mutex_.lock();
+      queue_size = update_tasks_[current_root_id_].queue_.size();
+      update_tasks_[current_root_id_].queue_mutex_.unlock();
+      if (queue_size != 0)
+        break;
+      current_root_id_ = (current_root_id_ + 1) % caffe::internode::nGroup;
     }
-    update_queue_mutex_[root_rank].unlock();
   }
+  update_tasks_[current_root_id_].queue_mutex_.lock();
+  to_update.swap(update_tasks_[current_root_id_].queue_);
+  update_tasks_[current_root_id_].queue_mutex_.unlock();
+  n_blob_current_root_ += to_update.size();
+  if (n_blob_current_root_ == n_blob_to_update_)
+    n_blob_current_root_ = 0;
+
   while (!to_update.empty() ) {
     TaskRequest task = to_update.front();
     to_update.pop_front();
@@ -140,8 +148,8 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
     int tag = to_send.front().GetTag();
     to_send.pop_front();
 
-    // // DEBUG
-    // LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
+    // DEBUG
+    LOG(INFO) << " launched send task for " << root_rank << " " << layer_id << " " << blob_id;
 
     std::pair<Dtype*, int64_t> buf = 
       send_buf_[make_pair(root_rank, make_pair(layer_id, blob_id) ) ];
@@ -173,10 +181,10 @@ void AsyncParamServer<Dtype>::ProcessRecvTask() {
       if (flag) {
         // currently no need to lock the solver buffer, as comp thread
         // takes care of two copy operations.
-        int root_rank = recv_tasks_[recv_tasks_iter_].root_task_;
-        update_queue_mutex_[root_rank].lock();
-        update_tasks_[root_rank].push_back(recv_tasks_[recv_tasks_iter_] );
-        update_queue_mutex_[root_rank].unlock();
+        int root_id = RootRankToId(recv_tasks_[recv_tasks_iter_].root_rank_);
+        update_tasks_[root_id].queue_mutex_.lock();
+        update_tasks_[root_id].queue_.push_back(recv_tasks_[recv_tasks_iter_] );
+        update_tasks_[root_id].queue_mutex_.unlock();
       }
     }
     recv_tasks_iter_ = (recv_tasks_iter_ + 1) % recv_tasks_.size();
