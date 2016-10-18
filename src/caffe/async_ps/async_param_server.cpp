@@ -64,9 +64,9 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
   n_blob_to_update_ = recv_tasks_.size() / caffe::internode::nGroup;
 
   // for normalizing the gradient with the number of workers
-  // int single_worker_iter_size = solver_->param().iter_size();
+  int single_worker_iter_size = solver_->param().iter_size();
   int n_worker_per_group = (mpi_size - 1) / caffe::internode::nGroup;
-  solver_->param().set_iter_size(n_worker_per_group);
+  solver_->param().set_iter_size(n_worker_per_group * single_worker_iter_size);
 }
 
 
