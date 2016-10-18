@@ -24,11 +24,11 @@ n_workers = 8
 
 all_n_groups = [1, 2, 4, 8]
 
-all_base_lr = [0.0001, 0.0003, 0.001] 
+all_base_lr = [0.00003, 0.0001, 0.0003, 0.001] 
 
-all_momentum = [0.0, 0.3, 0.6, 0.9]
+all_momentum = [0.0, 0.3, 0.45, 0.75, 0.9]
 
-time_out = 600
+time_out = 300
 
 group_batch_size = 128
 
