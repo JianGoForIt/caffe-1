@@ -24,7 +24,7 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
   int mpi_size;
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
   for (int i = 0; i < caffe::internode::nGroup; i++) {
-    int root_rank = mpi_size / caffe::internode::nGroup * i;
+    int root_rank = (mpi_size - 1) / caffe::internode::nGroup * i;
     for (int j = 0; j < solver_->net()->layers().size(); j++)
       for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
         int64_t blob_size = solver_->net()->layers()[j]->blobs()[k]->count();
