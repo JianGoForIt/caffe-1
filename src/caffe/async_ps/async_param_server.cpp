@@ -51,6 +51,10 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 
         // setup iter
         async_iter_[make_pair(i, j) ] = solver_->iter();
+
+        // setup round-robin control
+        if (i == 0)
+          round_robin_root_[make_pair(j, k) ] = root_rank;
       }
   }
 
@@ -152,15 +156,31 @@ void AsyncParamServer<Dtype>::ProcessSendTask() {
 template <typename Dtype>
 void AsyncParamServer<Dtype>::ProcessRecvTask() {
   int flag = 0;
+
+  int n_worker;
+  MPI_Comm_size(MPI_COMM_WORLD, &n_worker);
+  n_worker -= 1;
+  int n_worker_per_group = n_worker / caffe::internode::nGroup;
+
   for (int i = 0; i < recv_tasks_.size(); i++) {
-    if (recv_tasks_[recv_tasks_iter_].mpi_request_ != MPI_REQUEST_NULL) {
-      MPI_Test(&(recv_tasks_[recv_tasks_iter_].mpi_request_), &flag, MPI_STATUS_IGNORE);
-      if (flag) {
-        // currently no need to lock the solver buffer, as comp thread
-        // takes care of two copy operations.
-        update_queue_mutex_.lock();
-        update_tasks_.push_back(recv_tasks_[recv_tasks_iter_] );
-        update_queue_mutex_.unlock();
+
+    // check round of robin control
+    int root_rank = recv_tasks_[recv_tasks_iter_].root_rank_;
+    int layer_id = recv_tasks_[recv_tasks_iter_].layer_id_;
+    int blob_id = recv_tasks_[recv_tasks_iter_].blob_id_;
+    if (root_rank == round_robin_root_[make_pair(layer_id, blob_id) ] ) {
+
+      if (recv_tasks_[recv_tasks_iter_].mpi_request_ != MPI_REQUEST_NULL) {
+        MPI_Test(&(recv_tasks_[recv_tasks_iter_].mpi_request_), &flag, MPI_STATUS_IGNORE);
+        if (flag) {
+          // currently no need to lock the solver buffer, as comp thread
+          // takes care of two copy operations.
+          update_queue_mutex_.lock();
+          update_tasks_.push_back(recv_tasks_[recv_tasks_iter_] );
+          update_queue_mutex_.unlock();
+          round_robin_root_[make_pair(layer_id, blob_id) ] = 
+            (round_robin_root_[make_pair(layer_id, blob_id) ] + n_worker_per_group) % n_worker;
+        }
       }
     }
     recv_tasks_iter_ = (recv_tasks_iter_ + 1) % recv_tasks_.size();

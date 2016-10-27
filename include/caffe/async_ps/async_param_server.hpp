@@ -102,6 +102,9 @@ private:
   std::map<std::pair<int, std::pair<int, int> >, std::pair<Dtype*, int64_t> > recv_buf_;
   std::map<std::pair<int, std::pair<int, int> >, std::pair<Dtype*, int64_t> > send_buf_;
 
+  // for round robin control of async server
+  std::map<std::pair<int, int>, int> round_robin_root_;
+
   // for computation
   boost::shared_ptr<Solver<Dtype> > solver_;
   shared_ptr<BlobAccessor<Dtype> > blob_accessor_;
