@@ -17,6 +17,36 @@ LOSS_INDEX = 3
 
 # PLOTTING
 
+def plot_worker_staleness_histogram(config, bins=None):
+    print 'Staleness from ' + string_from_dict(config[0])
+
+    n_workers = int(config[0]['W'])
+
+    lines_workers = [list([]) for _ in xrange(n_workers)]
+
+    for l in range(len(all_lines)):
+        line = all_lines[l]
+        wi = line[1]
+        lines_workers[wi].append(l)
+    
+
+    grid_width = int(np.ceil(np.sqrt(n_workers)))
+
+    f, axarr = plt.subplots(grid_width,grid_width,figsize=(3*grid_width,3*grid_width))
+
+    for wi in range(n_workers):
+        all_staleness = np.array(lines_workers[wi][1:]) - np.array(lines_workers[wi][:-1])
+
+        i=wi/grid_width
+        j=wi%grid_width
+        if bins is None:
+            axarr[i,j].hist(all_staleness)
+        else:
+            axarr[i,j].hist(all_staleness,bins)
+        axarr[i,j].set_xlabel('Staleness')
+        axarr[i,j].set_ylabel('Frequency')
+        #axarr[i,j].set_title('Worker '+ str(wi))
+
 def plot_config_timings_histogram(configs, bins=None):
     n_plots = len(configs)
     f, axarr = plt.subplots(1,n_plots,figsize=(3*n_plots,3))
@@ -35,7 +65,7 @@ def plot_config_timings_histogram(configs, bins=None):
         axarr[i].set_ylabel('Frequency')
         axarr[i].set_title(string_from_dict(config[0]))
 
-def plot_worker_timings_histogram(config):
+def plot_worker_timings_histogram(config, bins=None):
     
     print 'Timings from ' + string_from_dict(config[0])
     
@@ -53,7 +83,10 @@ def plot_worker_timings_histogram(config):
 
         i=wi/grid_width
         j=wi%grid_width
-        axarr[i,j].hist(all_timings)
+        if bins is None:
+            axarr[i,j].hist(all_timings)
+        else:
+            axarr[i,j].hist(all_timings,bins)
         axarr[i,j].set_xlabel('Time to finish a step')
         axarr[i,j].set_ylabel('Frequency')
         axarr[i,j].set_title('Worker '+ str(wi))
