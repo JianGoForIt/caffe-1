@@ -15,6 +15,83 @@ COLOR_ASYNC='#E66826'
 
 LOSS_INDEX = 3
 
+# PLOTTING
+
+def plot_worker_staleness_histogram(config, bins=None):
+    print 'Staleness from ' + string_from_dict(config[0])
+
+    n_workers = int(config[0]['W'])
+
+    lines_workers = [list([]) for _ in xrange(n_workers)]
+
+    for l in range(len(all_lines)):
+        line = all_lines[l]
+        wi = line[1]
+        lines_workers[wi].append(l)
+    
+
+    grid_width = int(np.ceil(np.sqrt(n_workers)))
+
+    f, axarr = plt.subplots(grid_width,grid_width,figsize=(3*grid_width,3*grid_width))
+
+    for wi in range(n_workers):
+        all_staleness = np.array(lines_workers[wi][1:]) - np.array(lines_workers[wi][:-1])
+
+        i=wi/grid_width
+        j=wi%grid_width
+        if bins is None:
+            axarr[i,j].hist(all_staleness)
+        else:
+            axarr[i,j].hist(all_staleness,bins)
+        axarr[i,j].set_xlabel('Staleness')
+        axarr[i,j].set_ylabel('Frequency')
+        #axarr[i,j].set_title('Worker '+ str(wi))
+
+def plot_config_timings_histogram(configs, bins=None):
+    n_plots = len(configs)
+    f, axarr = plt.subplots(1,n_plots,figsize=(3*n_plots,3))
+    print axarr
+    for i in range(n_plots):
+        config = configs[i]
+        all_seconds, all_losses = get_times_losses(config[1])
+
+        all_timings = np.array(all_seconds[1:]) - np.array(all_seconds[:-1])
+
+        if bins is None:
+            axarr[i].hist(all_timings)
+        else:
+            axarr[i].hist(all_timings,bins)
+        axarr[i].set_xlabel('Time to finish a step')
+        axarr[i].set_ylabel('Frequency')
+        axarr[i].set_title(string_from_dict(config[0]))
+
+def plot_worker_timings_histogram(config, bins=None):
+    
+    print 'Timings from ' + string_from_dict(config[0])
+    
+    W=int(config[0]['W'])
+    
+    grid_width = int(np.ceil(np.sqrt(W)))
+    
+    f, axarr = plt.subplots(grid_width,grid_width,figsize=(3*grid_width,3*grid_width))
+
+    for wi in range(W):
+        lines_worker_0 = [line for line in config[1] if line[1]==wi]
+        all_seconds, all_losses = get_times_losses(lines_worker_0)
+
+        all_timings = np.array(all_seconds[1:]) - np.array(all_seconds[:-1])
+
+        i=wi/grid_width
+        j=wi%grid_width
+        if bins is None:
+            axarr[i,j].hist(all_timings)
+        else:
+            axarr[i,j].hist(all_timings,bins)
+        axarr[i,j].set_xlabel('Time to finish a step')
+        axarr[i,j].set_ylabel('Frequency')
+        axarr[i,j].set_title('Worker '+ str(wi))
+
+
 # PROCESSING
 
 def string_from_dict(dct, dct_minus={}):

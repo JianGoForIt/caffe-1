@@ -32,14 +32,15 @@ struct TaskRequest {
     root_rank_(root_rank), layer_id_(layer_id), blob_id_(blob_id), part_id_(part_id) {}
   void ParseInfo(int64_t mpi_rank, int64_t mpi_tag) {
     root_rank_ = mpi_rank;
-    layer_id_ = mpi_tag / 1e6;
-    mpi_tag -= layer_id_ * 1e6;
-    blob_id_ = mpi_tag / 1e4;
-    mpi_tag -= blob_id_ * 1e4;
+    mpi_tag -= 1973;
+    layer_id_ = mpi_tag / 100;
+    mpi_tag -= layer_id_ * 100;
+    blob_id_ = mpi_tag / 10;
+    mpi_tag -= blob_id_ * 10;
     part_id_ = mpi_tag;
   }
   int GetTag() {
-    return layer_id_ * 1e6 + blob_id_ * 1e4 + part_id_;
+    return layer_id_ * 100 + blob_id_ * 10 + part_id_ + 1973;
   }
 };
 
