@@ -316,6 +316,9 @@ class Layer {
     param_propagate_down_[param_id] = value;
   }
 
+  // Modified by Jian
+  LayerParameter* GetLayerParam() { return &layer_param_; }
+
 
  protected:
   /** The protobuf that stores the layer parameters */

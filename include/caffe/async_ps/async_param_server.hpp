@@ -55,7 +55,7 @@ struct TaskRequest {
 template <typename Dtype>
 class AsyncParamServer {
 public:
-  AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solver);
+  AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solver, int n_update_thread);
   ~AsyncParamServer() {
     // setup the mpi buffers
     int mpi_size;
@@ -68,6 +68,8 @@ public:
           std::free(recv_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
         }
     }
+
+    delete[] update_queue_mutex_;
   };
   // in the update task, the compute thread 
   // 0. lock the mutex on blob
@@ -76,7 +78,8 @@ public:
   // 3. copy the model to the corresponding mpi buffer
   // 4. submit a send task
   // 5. unlock the mutex blob
-  void ProcessUpdateTask();
+  int GetUpdateThreadId(const TaskRequest& task);
+  void ProcessUpdateTask(int thread_id);
   // in the Send task, we use non-blocking send for model parts going back to roots
   // We do not need to care about the request. Because if the blocking recv
   // has not finished on root, it will not start a new send task
@@ -84,17 +87,17 @@ public:
   // We iterate over the recv_tasks_ vector, when the request is done, we start a
   // new corresponding MPI non-blocking recv call.
   void ProcessRecvTask();
-  void ComputeLoop();
+  void ComputeLoop(int thread_id);
   void CommLoop();
   void Run();
 
 private:
   // for communication
-  // // protector for blob on the solver
-  // std::map<std::pair<int, int>, boost::mutex> solver_blob_mutex_;
-  std::deque<TaskRequest> update_tasks_;
+  int n_update_thread_;
+  std::vector<std::deque<TaskRequest> > update_tasks_;
   std::deque<TaskRequest> send_tasks_;
-  boost::mutex update_queue_mutex_;
+  boost::mutex* update_queue_mutex_;
+
   boost::mutex send_queue_mutex_;
   int recv_tasks_iter_;
   std::vector<TaskRequest> recv_tasks_;

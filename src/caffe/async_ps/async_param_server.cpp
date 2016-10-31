@@ -13,7 +13,7 @@ namespace async_param_server {
 using std::make_pair;
 
 template <typename Dtype>
-AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solver) :
+AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solver, int n_update_thread) :
   recv_tasks_iter_(0), 
   solver_(solver),
   blob_accessor_(BlobInfoFactory<Dtype>::create_blob_accessor(solver) ),
@@ -28,6 +28,13 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
     for (int j = 0; j < solver_->net()->layers().size(); j++)
       for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
         int64_t blob_size = solver_->net()->layers()[j]->blobs()[k]->count();
+
+
+        // DEBUG
+        LOG(INFO) << "layer id " << j << " " << solver_->net()->layers()[j]->GetLayerParam()->name();
+
+
+
         Dtype* buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
         recv_buf_[make_pair(root_rank, make_pair(j, k) ) ] = 
           make_pair(buf, blob_size);
@@ -54,20 +61,36 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
       }
   }
 
+  update_queue_mutex_ = new boost::mutex[n_update_thread];
+  for (int i = 0; i < n_update_thread; i++)
+    update_tasks_.push_back(std::deque<TaskRequest> () );
+
   // for normalizing the gradient with the number of workers
   int single_worker_iter_size = solver_->param().iter_size();
   int n_worker_per_group = (mpi_size - 1) / caffe::internode::nGroup;
   solver_->param().set_iter_size(n_worker_per_group * single_worker_iter_size);
+
+  // DEBUG
+  LOG(INFO) << " DEBUG stop here. ";
+  while(1);
+
+
+}
+
+
+template <typename Dtype>
+int AsyncParamServer<Dtype>::GetUpdateThreadId(const TaskRequest& task) {
+  return task.layer_id_ % n_update_thread_;
 }
 
 
 // TODO Jian how to get the correct iter number potentially get the version and set iter before update
 template <typename Dtype>
-void AsyncParamServer<Dtype>::ProcessUpdateTask() {
+void AsyncParamServer<Dtype>::ProcessUpdateTask(int thread_id) {
   std::deque<TaskRequest> to_update;
-  update_queue_mutex_.lock();
-  to_update.swap(update_tasks_);
-  update_queue_mutex_.unlock();
+  update_queue_mutex_[thread_id].lock();
+  to_update.swap(update_tasks_[thread_id] );
+  update_queue_mutex_[thread_id].unlock();
   while (!to_update.empty() ) {
     TaskRequest task = to_update.front();
     to_update.pop_front();
@@ -158,9 +181,10 @@ void AsyncParamServer<Dtype>::ProcessRecvTask() {
       if (flag) {
         // currently no need to lock the solver buffer, as comp thread
         // takes care of two copy operations.
-        update_queue_mutex_.lock();
-        update_tasks_.push_back(recv_tasks_[recv_tasks_iter_] );
-        update_queue_mutex_.unlock();
+        int thread_id = GetUpdateThreadId(recv_tasks_[recv_tasks_iter_] );
+        update_queue_mutex_[thread_id].lock();
+        update_tasks_[thread_id].push_back(recv_tasks_[recv_tasks_iter_] );
+        update_queue_mutex_[thread_id].unlock();
       }
     }
     recv_tasks_iter_ = (recv_tasks_iter_ + 1) % recv_tasks_.size();
@@ -170,12 +194,14 @@ void AsyncParamServer<Dtype>::ProcessRecvTask() {
 }
 
 
+// TODO update_cnt_ need to be done for multiple thread server
+
 template <typename Dtype>
-void AsyncParamServer<Dtype>::ComputeLoop() {
+void AsyncParamServer<Dtype>::ComputeLoop(int thread_id) {
   int64_t total_update =     
     caffe::internode::nGroup * recv_tasks_.size() * solver_->param().max_iter();
   do {
-    ProcessUpdateTask();
+    ProcessUpdateTask(thread_id);
   } while(update_cnt_ < total_update);
 
 }
@@ -195,7 +221,7 @@ void AsyncParamServer<Dtype>::CommLoop() {
 template <typename Dtype>
 void AsyncParamServer<Dtype>::Run() {
   // spawn compute thread
-  std::thread compute_thread(&AsyncParamServer<Dtype>::ComputeLoop, this);
+  std::thread compute_thread(&AsyncParamServer<Dtype>::ComputeLoop, this, 0);
   // spawn communication thread
   // std::thread comm_thread(&AsyncParamServer<Dtype>::CommLoop, this);
   CommLoop();

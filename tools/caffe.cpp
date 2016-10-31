@@ -78,6 +78,8 @@ DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
     " we want in the async forest");
 DEFINE_string(param_server_solver, "",
     "The dummy solver file with dummy data (do not connect to data server if used)");
+DEFINE_int32(n_async_server_thread, 1, "Optional; if given, specifies how many threads "
+    "are used to update models");
 
 
 // A simple registry for caffe commands.
@@ -173,7 +175,8 @@ RegisterBrewFunction(device_query);
 
 // Load the weights from the specified caffemodel(s) into the train and
 // test nets.
-void CopyLayers(caffe::Solver<float>* solver, const std::string& model_list) {
+template <typename Dtype>
+void CopyLayers(caffe::Solver<Dtype>* solver, const std::string& model_list) {
   std::vector<std::string> model_names;
   boost::split(model_names, model_list, boost::is_any_of(",") );
   for (int i = 0; i < model_names.size(); ++i) {
@@ -184,6 +187,18 @@ void CopyLayers(caffe::Solver<float>* solver, const std::string& model_list) {
     }
   }
 }
+
+// void CopyLayers(caffe::Solver<float>* solver, const std::string& model_list) {
+//   std::vector<std::string> model_names;
+//   boost::split(model_names, model_list, boost::is_any_of(",") );
+//   for (int i = 0; i < model_names.size(); ++i) {
+//     LOG(INFO) << "Finetuning from " << model_names[i];
+//     solver->net()->CopyTrainedLayersFrom(model_names[i]);
+//     for (int j = 0; j < solver->test_nets().size(); ++j) {
+//       solver->test_nets()[j]->CopyTrainedLayersFrom(model_names[i]);
+//     }
+//   }
+// }
 
 // Translate the signal effect the user specified on the command-line to the
 // corresponding enumeration.
@@ -319,8 +334,10 @@ int train() {
     }
 
     caffe::internode::nGroup = FLAGS_n_group;
+    caffe::internode::nAsyncServerThread = FLAGS_n_async_server_thread;
     if (IsParameterServer() ) {
-      caffe::async_param_server::AsyncParamServer<float> param_server(solver); 
+      caffe::async_param_server::AsyncParamServer<float> param_server(solver,
+        caffe::internode::nAsyncServerThread); 
       LOG(INFO) << "Starting parameter server in mpi environment";
       MPI_Barrier(MPI_COMM_WORLD);
       param_server.Run();
