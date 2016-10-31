@@ -221,6 +221,8 @@ void AsyncParamServer<Dtype>::Run() {
   for (int i = 0; i < n_update_thread_; i++) {
     compute_threads.push_back(std::thread (&AsyncParamServer<Dtype>::ComputeLoop, this, i) );
   }
+  LOG(INFO) << "launched " << n_update_thread_ << " update threads";
+
   // spawn communication thread
   CommLoop();
 
