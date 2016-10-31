@@ -70,15 +70,14 @@ template <typename Dtype>
 int AsyncParamServer<Dtype>::GetUpdateThreadId(const TaskRequest& task) {
   // TODO change the hard coded partition strategy
   // Currently designed to work for 3 threads
-  // if (task.layer_id_ <= 65)
-  //   return 0;
-  // else if (task.layer_id_ <= 118)
-  //   return 1;
-  // else if (task.layer_id_ <= 167)
-  //   return 2;
-  // else
-  //   return 3;
-  return 0;
+  if (task.layer_id_ <= 65)
+    return 0;
+  else if (task.layer_id_ <= 118)
+    return 1;
+  else if (task.layer_id_ <= 167)
+    return 2;
+  else
+    return 3;
 }
 
 
