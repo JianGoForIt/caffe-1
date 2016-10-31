@@ -114,11 +114,14 @@ private:
   // for termination: count the number of operations 
   // needed in total
   int64_t send_cnt_;
-  int64_t update_cnt_; 
-
+  int64_t update_cnt_; // not using for multiple update thread case
 
   // iter for different blobs
   std::map<std::pair<int, int>, int64_t> async_iter_;
+
+  // flag to stop all the update threads
+  bool stop_flag_;
+  boost::mutex stop_flag_mutex_;
 };
 
 } // end of namespace async_param_server
