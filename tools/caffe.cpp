@@ -244,10 +244,6 @@ bool IsParameterServer() {
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
-  // DEBUG
-  LOG(INFO) << "check server " << mpi_rank;
-
-
   if (mpi_rank >= mpi_size - caffe::internode::nServer)
     return true;
   else
