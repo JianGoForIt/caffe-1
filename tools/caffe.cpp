@@ -243,6 +243,11 @@ bool IsParameterServer() {
   int mpi_size;
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+
+  // DEBUG
+  LOG(INFO) << "check server " << mpi_rank;
+
+
   if (mpi_rank >= mpi_size - caffe::internode::nServer)
     return true;
   else
@@ -259,6 +264,10 @@ int train() {
 
   caffe::SolverParameter solver_param;
 
+  // Modified by Jian
+  caffe::internode::nGroup = FLAGS_n_group;
+  caffe::internode::nServer = FLAGS_n_server;
+  
   if (!IsParameterServer() ) {
     if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
       caffe::MultiPhaseSolverParameter multi_solver_params;
@@ -381,9 +390,6 @@ int train() {
       LOG(ERROR) << "currently unsupported";
       return 1;
     }
-
-    caffe::internode::nGroup = FLAGS_n_group;
-    caffe::internode::nServer = FLAGS_n_server;
     if (IsParameterServer() ) {
       caffe::async_param_server::AsyncParamServer<float> param_server(solver); 
       LOG(INFO) << "Starting parameter server in mpi environment";

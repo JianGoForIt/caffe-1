@@ -27,10 +27,14 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
 
   // setup the mpi buffers and recv task vector
   int mpi_size;
+  int mpi_rank;
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
   for (int i = 0; i < caffe::internode::nGroup; i++) {
-    int root_rank = (mpi_size - 1) / caffe::internode::nGroup * i;
-    for (int j = 0; j < solver_->net()->layers().size(); j++)
+    int root_rank = (mpi_size - caffe::internode::nServer) / caffe::internode::nGroup * i;
+    for (int j = 0; j < solver_->net()->layers().size(); j++) {
+      if (caffe::internode::LayerIdToServerRank(solver_->net()->layers().size(), j) != mpi_rank)
+        continue;
       for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
         int64_t blob_size = solver_->net()->layers()[j]->blobs()[k]->count();
         Dtype* buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
@@ -57,11 +61,12 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
         // setup iter
         async_iter_[make_pair(i, j) ] = solver_->iter();
       }
+    }
   }
 
   // for normalizing the gradient with the number of workers
   int single_worker_iter_size = solver_->param().iter_size();
-  int n_worker_per_group = (mpi_size - 1) / caffe::internode::nGroup;
+  int n_worker_per_group = (mpi_size - caffe::internode::nServer) / caffe::internode::nGroup;
   solver_->param().set_iter_size(n_worker_per_group * single_worker_iter_size);
 }
 
@@ -95,8 +100,10 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
 
     solver_->ApplyUpdate(param_id);
 
-    // // DEBUG
-    // LOG(INFO) << "UPDATE root rank " << task.root_rank_ << " layer " << task.layer_id_ << " blob " << task.blob_id_;
+    // DEBUG
+    int mpi_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    LOG(INFO) << "Server rank " << mpi_rank << " UPDATE root rank " << task.root_rank_ << " layer " << task.layer_id_ << " blob " << task.blob_id_;
 
     solver_->net()->ClearParamDiffs(param_id);
     async_iter_[make_pair(task.layer_id_, task.blob_id_) ] += 1;

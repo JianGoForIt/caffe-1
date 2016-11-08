@@ -59,14 +59,20 @@ public:
   ~AsyncParamServer() {
     // setup the mpi buffers
     int mpi_size;
+    int mpi_rank;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    int n_layer = solver_->net()->layers().size();
     for (int i = 0; i < caffe::internode::nGroup; i++) {
       int root_rank = mpi_size / caffe::internode::nGroup * i;
-      for (int j = 0; j < solver_->net()->layers().size(); j++)
+      for (int j = 0; j < solver_->net()->layers().size(); j++) {
+        if (caffe::internode::LayerIdToServerRank(n_layer, j) != mpi_rank)
+          continue;
         for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
           std::free(send_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
           std::free(recv_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
         }
+      }
     }
   };
   // in the update task, the compute thread 

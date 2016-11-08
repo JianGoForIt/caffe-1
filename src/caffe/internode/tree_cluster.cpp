@@ -306,7 +306,7 @@ class MpiTreeClient : public TreeWaypoint {
     RemoteId current = id();
     int count = mpi_get_comm_size();
 
-    int group_size = (count - 1) / nGroup;
+    int group_size = (count - nServer) / nGroup;
     int group_id = current / group_size;
     
     // if (group_size < 2) return children;
@@ -329,7 +329,7 @@ class MpiTreeClient : public TreeWaypoint {
     RemoteId current = id();
 
     int count = mpi_get_comm_size();
-    int group_size = (count - 1) / nGroup;
+    int group_size = (count - nServer) / nGroup;
     int group_id = current / group_size;
 
 

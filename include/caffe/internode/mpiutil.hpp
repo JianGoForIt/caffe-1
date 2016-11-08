@@ -69,6 +69,8 @@ std::string mpi_get_error_string(int errorcode);
 void mpi_init(int argc, char** argv);
 void mpi_finalize();
 
+int LayerIdToServerRank(int n_layer, int layer_id);
+
 }  // namespace internode
 }  // namespace caffe
 
