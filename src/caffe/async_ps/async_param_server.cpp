@@ -94,10 +94,10 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
 
     solver_->ApplyUpdate(param_id);
 
-    // DEBUG
-    int mpi_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    LOG(INFO) << "Server rank " << mpi_rank << " UPDATE root rank " << task.root_rank_ << " layer " << task.layer_id_ << " blob " << task.blob_id_;
+    //// DEBUG
+    //int mpi_rank;
+    //MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    //LOG(INFO) << "Server rank " << mpi_rank << " UPDATE root rank " << task.root_rank_ << " layer " << task.layer_id_ << " blob " << task.blob_id_;
 
     solver_->net()->ClearParamDiffs(param_id);
     async_iter_[make_pair(task.layer_id_, task.blob_id_) ] += 1;

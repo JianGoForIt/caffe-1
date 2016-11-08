@@ -366,9 +366,9 @@ class SynchronousSync : public InternalThread
       param_server_rank = caffe::internode::LayerIdToServerRank(n_layer, layer_id);
       int n_blob = solver->net()->layers()[layer_id]->blobs().size();
       
-       // DEBUG
-      LOG(INFO) << "root rank " << mpi_rank << " send layer" 
-        << layer_id << "/" << n_layer << " to server rank " << param_server_rank;
+      // // DEBUG
+      //LOG(INFO) << "root rank " << mpi_rank << " send layer" 
+      //  << layer_id << "/" << n_layer << " to server rank " << param_server_rank;
 
 
       for (int blob_id = 0; blob_id < n_blob; blob_id++) {
@@ -504,9 +504,9 @@ class SynchronousSync : public InternalThread
     int n_blob = solver->net()->layers()[layer_id]->blobs().size();
     MPI_Request* recv_req = (MPI_Request*)malloc(sizeof(MPI_Request) * n_blob);
     
-    // DEBUG
-    LOG(INFO) << "root rank " << mpi_rank << " recv layer" 
-      << layer_id << "/" << n_layer << " from server rank " << param_server_rank;
+    //// DEBUG
+    //LOG(INFO) << "root rank " << mpi_rank << " recv layer" 
+    //  << layer_id << "/" << n_layer << " from server rank " << param_server_rank;
 
     for (int blob_id = 0; blob_id < n_blob; blob_id++) {
       Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
