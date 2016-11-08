@@ -118,6 +118,8 @@ DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
     " we want in the async forest");
 DEFINE_string(param_server_solver, "",
     "The dummy solver file with dummy data (do not connect to data server if used)");
+DEFINE_int32(n_server, 1, "Optional; if given, it specifies how many parts"
+    "The model is splited to. I.e. how many process you have for param server");
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -241,7 +243,7 @@ bool IsParameterServer() {
   int mpi_size;
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-  if (mpi_rank == mpi_size - 1)
+  if (mpi_rank >= mpi_size - caffe::internode::nServer)
     return true;
   else
     return false;
@@ -381,6 +383,7 @@ int train() {
     }
 
     caffe::internode::nGroup = FLAGS_n_group;
+    caffe::internode::nServer = FLAGS_n_server;
     if (IsParameterServer() ) {
       caffe::async_param_server::AsyncParamServer<float> param_server(solver); 
       LOG(INFO) << "Starting parameter server in mpi environment";

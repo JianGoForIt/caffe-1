@@ -60,7 +60,7 @@ namespace internode {
 
 // Modified by Jian
 int nGroup = 1;
-
+int nServer = 1;
 int init_count = 0;
 
 /**

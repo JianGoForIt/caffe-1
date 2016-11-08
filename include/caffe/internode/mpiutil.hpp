@@ -58,6 +58,7 @@ namespace internode {
 
 // Modified by Jian
 extern int nGroup;
+extern int nServer;
 
 int mpi_get_current_proc_rank();
 std::string mpi_get_current_proc_rank_as_string();
