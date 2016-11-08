@@ -140,6 +140,15 @@ void mpi_finalize() {
 #endif
 }
 
+// Modified by Jian
+int LayerIdToServerRank(int n_layer, int layer_id) {
+  int mpi_size;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  int param_server_rank = (mpi_size - caffe::internode::nServer)
+    + layer_id / (n_layer / caffe::internode::nServer + 1);
+  return param_server_rank;
+}
+
 }  // namespace internode
 }  // namespace caffe
 
