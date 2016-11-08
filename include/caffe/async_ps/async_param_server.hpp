@@ -66,8 +66,8 @@ public:
     for (int i = 0; i < caffe::internode::nGroup; i++) {
       int root_rank = mpi_size / caffe::internode::nGroup * i;
       for (int j = 0; j < solver_->net()->layers().size(); j++) {
-        //if (caffe::internode::LayerIdToServerRank(n_layer, j) != mpi_rank)
-        //  continue;
+        // if (caffe::internode::LayerIdToServerRank(n_layer, j) != mpi_rank)
+        //   continue;
         for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
           std::free(send_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
           std::free(recv_buf_[make_pair(root_rank, make_pair(j, k) ) ].first);
