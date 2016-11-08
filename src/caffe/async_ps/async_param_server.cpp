@@ -28,8 +28,8 @@ AsyncParamServer<Dtype>::AsyncParamServer(boost::shared_ptr<Solver<Dtype> > solv
   for (int i = 0; i < caffe::internode::nGroup; i++) {
     int root_rank = (mpi_size - caffe::internode::nServer) / caffe::internode::nGroup * i;
     for (int j = 0; j < solver_->net()->layers().size(); j++) {
-      if (caffe::internode::LayerIdToServerRank(solver_->net()->layers().size(), j) != mpi_rank)
-        continue;
+      // if (caffe::internode::LayerIdToServerRank(solver_->net()->layers().size(), j) != mpi_rank)
+      //   continue;
       for (int k = 0; k < solver_->net()->layers()[j]->blobs().size(); k++) {
         int64_t blob_size = solver_->net()->layers()[j]->blobs()[k]->count();
         Dtype* buf = (Dtype*)std::malloc(sizeof(Dtype) * blob_size);
