@@ -1,3 +1,40 @@
+/*
+All modification made by Intel Corporation: © 2016 Intel Corporation
+
+All contributions by the University of California:
+Copyright (c) 2014, 2015, The Regents of the University of California (Regents)
+All rights reserved.
+
+All other contributions:
+Copyright (c) 2014, 2015, the respective contributors
+All rights reserved.
+For the list of contributors go to https://github.com/BVLC/caffe/blob/master/CONTRIBUTORS.md
+
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #ifdef WITH_PYTHON_LAYER
 #include "boost/python.hpp"
 namespace bp = boost::python;
@@ -16,6 +53,7 @@ namespace bp = boost::python;
 #include "caffe/caffe.hpp"
 #include "caffe/internode/mpiutil.hpp"
 #include "caffe/multinode/multinode.hpp"
+#include "caffe/training_utils.hpp"
 #include "caffe/util/signal_handler.h"
 
 
@@ -71,6 +109,16 @@ DEFINE_int32(comm_threads, 1,
     " The number of threads used by communication code.");
 DEFINE_bool(forward_only, false,
     "Optional; Execute only forward pass");
+DEFINE_string(engine, "",
+    "Optional; Engine sequence in format: engine:subengine_1,subengine_2,...");
+
+
+// Modified by Jian
+DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
+    " we want in the async forest");
+DEFINE_string(param_server_solver, "",
+    "The dummy solver file with dummy data (do not connect to data server if used)");
+
 
 
 // Modified by Jian
@@ -145,13 +193,6 @@ caffe::Phase get_phase_from_flags(caffe::Phase default_value) {
   return caffe::TRAIN;  // Avoid warning
 }
 
-// Parse stages from flags
-vector<string> get_stages_from_flags() {
-  vector<string> stages;
-  boost::split(stages, FLAGS_stage, boost::is_any_of(","));
-  return stages;
-}
-
 // caffe commands to call by
 //     caffe <command> <args>
 //
@@ -222,18 +263,48 @@ int train() {
   CHECK(!FLAGS_snapshot.size() || !FLAGS_weights.size())
       << "Give a snapshot to resume training or weights to finetune "
       "but not both.";
-  vector<string> stages = get_stages_from_flags();
 
   caffe::SolverParameter solver_param;
 
-  if (IsParameterServer() )
-    caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_param_server_solver, &solver_param);
-  else
-    caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
+  if (!IsParameterServer() ) {
+    if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
+      caffe::MultiPhaseSolverParameter multi_solver_params;
+      CHECK(caffe::ReadProtoFromTextFile(FLAGS_solver, &multi_solver_params))
+        << "Failed to parse SolverParameter file: "  <<  FLAGS_solver;
+      return multiphase_train(
+        &multi_solver_params,
+        FLAGS_solver,
+        FLAGS_engine,
+        FLAGS_level,
+        FLAGS_stage);
+    }
 
-  solver_param.mutable_train_state()->set_level(FLAGS_level);
-  for (int i = 0; i < stages.size(); i++) {
-    solver_param.mutable_train_state()->add_stage(stages[i]);
+    use_flags(
+      &solver_param,
+      FLAGS_solver,
+      FLAGS_engine,
+      FLAGS_level,
+      FLAGS_stage);
+  }
+  else {
+    if (!caffe::ReadProtoFromTextFile(FLAGS_param_server_solver, &solver_param)) {
+      caffe::MultiPhaseSolverParameter multi_solver_params;
+      CHECK(caffe::ReadProtoFromTextFile(FLAGS_param_server_solver, &multi_solver_params))
+        << "Failed to parse SolverParameter file: "  <<  FLAGS_param_server_solver;
+      return multiphase_train(
+        &multi_solver_params,
+        FLAGS_param_server_solver,
+        FLAGS_engine,
+        FLAGS_level,
+        FLAGS_stage);
+    }
+
+    use_flags(
+      &solver_param,
+      FLAGS_param_server_solver,
+      FLAGS_engine,
+      FLAGS_level,
+      FLAGS_stage);
   }
 
   // If the gpus flag is not provided, allow the mode and device to be set
@@ -381,7 +452,7 @@ RegisterBrewFunction(data_server);
 int test() {
   CHECK_GT(FLAGS_model.size(), 0) << "Need a model definition to score.";
   CHECK_GT(FLAGS_weights.size(), 0) << "Need model weights to score.";
-  vector<string> stages = get_stages_from_flags();
+  vector<string> stages = get_stages_from_flags(FLAGS_stage);
 
   // Set device id and mode
   vector<int> gpus;
@@ -400,7 +471,8 @@ int test() {
     Caffe::set_mode(Caffe::CPU);
   }
   // Instantiate the caffe net.
-  Net<float> caffe_net(FLAGS_model, caffe::TEST, FLAGS_level, &stages);
+  Net<float> caffe_net(FLAGS_model, caffe::TEST, FLAGS_level, &stages, NULL,
+                       FLAGS_engine);
   caffe_net.CopyTrainedLayersFrom(FLAGS_weights);
   LOG(INFO) << "Running for " << FLAGS_iterations << " iterations.";
 
@@ -454,7 +526,7 @@ RegisterBrewFunction(test);
 int time() {
   CHECK_GT(FLAGS_model.size(), 0) << "Need a model definition to time.";
   caffe::Phase phase = get_phase_from_flags(caffe::TRAIN);
-  vector<string> stages = get_stages_from_flags();
+  vector<string> stages = get_stages_from_flags(FLAGS_stage);
 
   // Set device id and mode
   vector<int> gpus;
@@ -468,7 +540,8 @@ int time() {
     Caffe::set_mode(Caffe::CPU);
   }
   // Instantiate the caffe net.
-  Net<float> caffe_net(FLAGS_model, phase, FLAGS_level, &stages);
+  Net<float> caffe_net(FLAGS_model, phase, FLAGS_level, &stages, NULL,
+                       FLAGS_engine);
 
   // Do a clean forward and backward pass, so that memory allocation are done
   // and future iterations will be more stable.
@@ -478,7 +551,7 @@ int time() {
   float initial_loss;
   caffe_net.Forward(&initial_loss);
   LOG(INFO) << "Initial loss: " << initial_loss;
-  if (!FLAGS_forward_only){
+  if (!FLAGS_forward_only) {
     LOG(INFO) << "Performing Backward";
     caffe_net.Backward();
   }

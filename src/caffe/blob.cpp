@@ -1,3 +1,40 @@
+/*
+All modification made by Intel Corporation: © 2016 Intel Corporation
+
+All contributions by the University of California:
+Copyright (c) 2014, 2015, The Regents of the University of California (Regents)
+All rights reserved.
+
+All other contributions:
+Copyright (c) 2014, 2015, the respective contributors
+All rights reserved.
+For the list of contributors go to https://github.com/BVLC/caffe/blob/master/CONTRIBUTORS.md
+
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include <climits>
 #include <vector>
 
@@ -31,19 +68,24 @@ void Blob<Dtype>::Reshape(const vector<int>& shape) {
   }
   int* shape_data = static_cast<int*>(shape_data_->mutable_cpu_data());
 #endif
-
+  bool actual_reshaping = false;
   for (int i = 0; i < shape.size(); ++i) {
     CHECK_GE(shape[i], 0);
     if (count_ != 0) {
       CHECK_LE(shape[i], INT_MAX / count_) << "blob size exceeds INT_MAX";
     }
     count_ *= shape[i];
-    shape_[i] = shape[i];
+    if (shape_[i] != shape[i]) {
+      actual_reshaping = true;
+      shape_[i] = shape[i];
+    }
 #ifndef CPU_ONLY
     shape_data[i] = shape[i];
 #endif
   }
-  if (count_ > capacity_) {
+  // We restart sync objects when there was change of shape
+  // requested count is bgger than current capacity
+  if ( (actual_reshaping == true) || (count_ > capacity_) ) {
     capacity_ = count_;
     data_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
     diff_.reset(new SyncedMemory(capacity_ * sizeof(Dtype)));
@@ -297,6 +339,9 @@ template <typename Dtype>
 Dtype Blob<Dtype>::asum_diff() const {
   if (!diff_) { return 0; }
   switch (diff_->head()) {
+  case SyncedMemory::SYNCED_PRV:
+  case SyncedMemory::HEAD_AT_PRV:
+    return caffe_cpu_asum( prv_diff_count(), prv_diff());
   case SyncedMemory::HEAD_AT_CPU:
     return caffe_cpu_asum(count_, cpu_diff());
   case SyncedMemory::HEAD_AT_GPU:
@@ -334,6 +379,11 @@ Dtype Blob<Dtype>::sumsq_data() const {
   const Dtype* data;
   if (!data_) { return 0; }
   switch (data_->head()) {
+  case SyncedMemory::SYNCED_PRV:
+  case SyncedMemory::HEAD_AT_PRV:
+      data = prv_data();
+      sumsq = caffe_cpu_dot(prv_data_count(), data, data);
+      break;
   case SyncedMemory::HEAD_AT_CPU:
     data = cpu_data();
     sumsq = caffe_cpu_dot(count_, data, data);
@@ -371,6 +421,11 @@ Dtype Blob<Dtype>::sumsq_diff() const {
   const Dtype* diff;
   if (!diff_) { return 0; }
   switch (diff_->head()) {
+  case SyncedMemory::SYNCED_PRV:
+  case SyncedMemory::HEAD_AT_PRV:
+      diff = prv_diff();
+      sumsq = caffe_cpu_dot(prv_diff_count(), diff, diff);
+      break;
   case SyncedMemory::HEAD_AT_CPU:
     diff = cpu_diff();
     sumsq = caffe_cpu_dot(count_, diff, diff);
@@ -387,7 +442,7 @@ Dtype Blob<Dtype>::sumsq_diff() const {
   case SyncedMemory::UNINITIALIZED:
     return 0;
   default:
-    LOG(FATAL) << "Unknown SyncedMemory head state: " << data_->head();
+    LOG(FATAL) << "Unknown SyncedMemory head state: " << diff_->head();
   }
   return sumsq;
 }
@@ -405,6 +460,11 @@ void Blob<Dtype>::scale_data(Dtype scale_factor) {
   Dtype* data;
   if (!data_) { return; }
   switch (data_->head()) {
+  case SyncedMemory::SYNCED_PRV:
+  case SyncedMemory::HEAD_AT_PRV:
+      data = mutable_prv_data();
+      caffe_scal(prv_data_count(), scale_factor, data);
+      break;
   case SyncedMemory::HEAD_AT_CPU:
     data = mutable_cpu_data();
     caffe_scal(count_, scale_factor, data);
@@ -438,6 +498,11 @@ void Blob<Dtype>::scale_diff(Dtype scale_factor) {
   Dtype* diff;
   if (!diff_) { return; }
   switch (diff_->head()) {
+  case SyncedMemory::SYNCED_PRV:
+  case SyncedMemory::HEAD_AT_PRV:
+      diff = mutable_prv_diff();
+      caffe_scal(prv_diff_count(), scale_factor, diff);
+      break;
   case SyncedMemory::HEAD_AT_CPU:
     diff = mutable_cpu_diff();
     caffe_scal(count_, scale_factor, diff);

@@ -1,3 +1,40 @@
+/*
+All modification made by Intel Corporation: © 2016 Intel Corporation
+
+All contributions by the University of California:
+Copyright (c) 2014, 2015, The Regents of the University of California (Regents)
+All rights reserved.
+
+All other contributions:
+Copyright (c) 2014, 2015, the respective contributors
+All rights reserved.
+For the list of contributors go to https://github.com/BVLC/caffe/blob/master/CONTRIBUTORS.md
+
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include <Python.h>  // NOLINT(build/include_alpha)
 
 // Produce deprecation warnings (needs to come before arrayobject.h inclusion).
@@ -91,8 +128,15 @@ void CheckContiguousArray(PyArrayObject* arr, string name,
 // Net constructor
 shared_ptr<Net<Dtype> > Net_Init(string network_file, int phase,
     const int level, const bp::object& stages,
-    const bp::object& weights) {
+    const bp::object& weights,
+    const bp::object& engine) {
   CheckFile(network_file);
+
+  // Extract engine if specified
+  string engine_str = "";
+  if (!engine.is_none()) {
+    engine_str = bp::extract<std::string>(engine);
+  }
 
   // Convert stages from list to vector
   vector<string> stages_vector;
@@ -104,7 +148,7 @@ shared_ptr<Net<Dtype> > Net_Init(string network_file, int phase,
 
   // Initialize net
   shared_ptr<Net<Dtype> > net(new Net<Dtype>(network_file,
-        static_cast<Phase>(phase), level, &stages_vector));
+        static_cast<Phase>(phase), level, &stages_vector, NULL, engine_str));
 
   // Load weights
   if (!weights.is_none()) {
@@ -296,7 +340,8 @@ BOOST_PYTHON_MODULE(_caffe) {
     .def("__init__", bp::make_constructor(&Net_Init,
           bp::default_call_policies(), (bp::arg("network_file"), "phase",
             bp::arg("level")=0, bp::arg("stages")=bp::object(),
-            bp::arg("weights")=bp::object())))
+            bp::arg("weights")=bp::object(),
+            bp::arg("engine")=bp::object())))
     // Legacy constructor
     .def("__init__", bp::make_constructor(&Net_Init_Load))
     .def("_forward", &Net<Dtype>::ForwardFromTo)
