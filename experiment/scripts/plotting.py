@@ -114,10 +114,14 @@ def load_results(log_file_name):
     with open(log_file_name, "r") as f:
         for line in f.readlines():
             if re.match('(.*)solver\.cpp(.*)Iteration(.*)loss(.*)', line):
-                (
-                 _,time_field,pid,source_line,worker_id,check_iteration,
-                 niter,check_loss,check_equals,loss
-                ) =line.split()
+                try:
+                    (
+                     _,time_field,pid,source_line,worker_id,check_iteration,
+                     niter,check_loss,check_equals,loss
+                    ) =line.split()
+                except ValueError:
+                    print line
+                    continue
                 assert(check_iteration=="Iteration")
                 assert(check_loss=="loss")
                 assert(check_equals=='=')

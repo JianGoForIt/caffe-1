@@ -120,6 +120,14 @@ DEFINE_string(param_server_solver, "",
     "The dummy solver file with dummy data (do not connect to data server if used)");
 
 
+
+// Modified by Jian
+DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
+    " we want in the async forest");
+DEFINE_string(param_server_solver, "",
+    "The dummy solver file with dummy data (do not connect to data server if used)");
+
+
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
 typedef std::map<caffe::string, BrewFunction> BrewMap;
@@ -257,37 +265,6 @@ int train() {
       "but not both.";
 
   caffe::SolverParameter solver_param;
-// <<<<<<< 37c817036ccffc64123c1ff02f612e06f63f3a1e
-//   if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
-//     caffe::MultiPhaseSolverParameter multi_solver_params;
-//     CHECK(caffe::ReadProtoFromTextFile(FLAGS_solver, &multi_solver_params))
-//       << "Failed to parse SolverParameter file: "  <<  FLAGS_solver;
-//     return multiphase_train(
-//       &multi_solver_params,
-//       FLAGS_solver,
-//       FLAGS_engine,
-//       FLAGS_level,
-//       FLAGS_stage);
-//   }
-
-//   use_flags(
-//     &solver_param,
-//     FLAGS_solver,
-//     FLAGS_engine,
-//     FLAGS_level,
-//     FLAGS_stage);
-// =======
-
-//   if (IsParameterServer() )
-//     caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_param_server_solver, &solver_param);
-//   else
-//     caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
-
-//   solver_param.mutable_train_state()->set_level(FLAGS_level);
-//   for (int i = 0; i < stages.size(); i++) {
-//     solver_param.mutable_train_state()->add_stage(stages[i]);
-//   }
-// >>>>>>> First commit for single server asynchronous architecture
 
   if (!IsParameterServer() ) {
     if (!caffe::ReadProtoFromTextFile(FLAGS_solver, &solver_param)) {
