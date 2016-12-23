@@ -119,15 +119,6 @@ DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
 DEFINE_string(param_server_solver, "",
     "The dummy solver file with dummy data (do not connect to data server if used)");
 
-
-
-// Modified by Jian
-DEFINE_int32(n_group, 1, "Optional; if given, it specifies how many trees"
-    " we want in the async forest");
-DEFINE_string(param_server_solver, "",
-    "The dummy solver file with dummy data (do not connect to data server if used)");
-
-
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
 typedef std::map<caffe::string, BrewFunction> BrewMap;
