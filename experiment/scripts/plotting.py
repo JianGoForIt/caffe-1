@@ -144,7 +144,7 @@ def load_profiling_info(log_file_name):
             if parsed_dict:
                 all_events.append(parsed_dict)
                 
-    return all_events
+    return sorted(all_events,key=(lambda elmt: elmt['time']))
 
 def load_loss_info(log_file_name):
     all_losses = []
@@ -164,14 +164,15 @@ def parse_profile_log_line(line):
         return parsed_dict
     
     # Parse profiling line
-    m=re.search('\[(?P<worker_id>[0-9]*)\] PROFILING (?P<prof_event>(BEGIN)|(END))\[(?P<prof_name>[^\]]*)\] Iteration (?P<iteration>[0-9]*)', line)
+    m=re.search('\[(?P<worker_id>[0-9]*)\] PROFILING (?P<prof_event>(BEGIN)|(END))\[(?P<prof_name>[^\]]*)\]', line)
+    #m=re.search('\[(?P<worker_id>[0-9]*)\] PROFILING (?P<prof_event>(BEGIN)|(END))\[(?P<prof_name>[^\]]*)\] Iteration (?P<iteration>[0-9]*)', line)
     #m=re.search('PROFILING (?P<prof_event>(BEGIN)|(END))', line)
     #m=re.search('PROFILING', line)
     if m:
         parsed_dict['worker_id']=int(m.groupdict()['worker_id'])
         parsed_dict['prof_event']=m.groupdict()['prof_event']
         parsed_dict['prof_name']=m.groupdict()['prof_name']
-        parsed_dict['iteration']=int(m.groupdict()['iteration'])
+        #parsed_dict['iteration']=int(m.groupdict()['iteration'])
         return parsed_dict
     else:
         return {}
