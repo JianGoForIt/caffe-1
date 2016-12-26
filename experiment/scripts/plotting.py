@@ -135,3 +135,74 @@ def load_results(log_file_name):
 
     return all_lines
 
+def load_profiling_info(log_file_name):
+    all_events = []
+
+    with open(log_file_name, "r") as f:
+        for line in f.readlines():
+            parsed_dict = parse_profile_log_line(line)
+            if parsed_dict:
+                all_events.append(parsed_dict)
+                
+    return all_events
+
+def load_loss_info(log_file_name):
+    all_losses = []
+
+    with open(log_file_name, "r") as f:
+        for line in f.readlines():
+            parsed_dict = parse_loss_log_line(line)
+            if parsed_dict:
+                all_losses.append(parsed_dict)
+                
+    return all_losses
+
+def parse_profile_log_line(line):
+    parsed_dict = parse_generic_log_line(line)
+
+    if not parsed_dict:
+        return parsed_dict
+    
+    # Parse profiling line
+    m=re.search('\[(?P<worker_id>[0-9]*)\] PROFILING (?P<prof_event>(BEGIN)|(END))\[(?P<prof_name>[^\]]*)\] Iteration (?P<iteration>[0-9]*)', line)
+    #m=re.search('PROFILING (?P<prof_event>(BEGIN)|(END))', line)
+    #m=re.search('PROFILING', line)
+    if m:
+        parsed_dict['worker_id']=int(m.groupdict()['worker_id'])
+        parsed_dict['prof_event']=m.groupdict()['prof_event']
+        parsed_dict['prof_name']=m.groupdict()['prof_name']
+        parsed_dict['iteration']=int(m.groupdict()['iteration'])
+        return parsed_dict
+    else:
+        return {}
+
+def parse_loss_log_line(line):
+    parsed_dict = parse_generic_log_line(line)
+    
+    if not parsed_dict:
+        return parsed_dict
+        
+    # Parse loss line
+#    m=re.search('\[(?P<worker_id>[0-9]*)\] Iteration (?P<iteration>[0-9]*), loss = (?P<loss>[0-9]*)', line)
+    m=re.search('\[(?P<worker_id>[0-9]*)\] Iteration (?P<iteration>[0-9]*), loss = (?P<loss>[0-9e\-\.]*)$', line)
+    
+    if m:
+        parsed_dict['worker_id']=int(m.groupdict()['worker_id'])
+        parsed_dict['iteration']=int(m.groupdict()['iteration'])
+        parsed_dict['loss']=float(m.groupdict()['loss'])
+        return parsed_dict
+    else:
+        return {}
+
+def parse_generic_log_line(line):
+    parsed_dict = {}
+    m=re.search('[IE](?P<date>[0-9]*) (?P<time>[^ ]*) (?P<pid>[0-9]*) (?P<source_line>[^\]]*)\] (?P<remainder>.*)', line) 
+    if m:
+        dt = datetime.datetime.strptime(m.groupdict()['date']+m.groupdict()['time'], "%m%d%H:%M:%S.%f")
+        dt = dt.replace(year=datetime.datetime.now().year)
+        parsed_dict['time']=dt
+        parsed_dict['source_line']=m.groupdict()['source_line']
+        parsed_dict['pid']=int(m.groupdict()['pid'])
+        parsed_dict['remainder']=m.groupdict()['remainder']        
+
+    return parsed_dict
