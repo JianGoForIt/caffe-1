@@ -69,6 +69,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <mpi.h>
 
 
+// PROFILING
+
+#define PROFILE_BEGIN(name)      \
+    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
+              << " PROFILING BEGIN[" << name << "]"
+
+              
+#define PROFILE_END(name)      \
+    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
+              << " PROFILING END[" << name << "]"
+
 
 namespace caffe {
 
@@ -232,6 +243,8 @@ class SynchronousSync : public InternalThread
     }
 
     virtual void synced(uint32_t version) {
+      PROFILE_END("WaitingToSync");
+      PROFILE_BEGIN("Forward");
       instance->synced_parameters(version);
     }
 

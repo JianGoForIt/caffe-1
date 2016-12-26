@@ -73,7 +73,6 @@ template <typename Dtype>
 Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
   Dtype loss = 0;
   Net<Dtype>& net = *root_solver_->net();
-  PROFILE_BEGIN("Forward");
   for (int i = 0; i < net.layers().size(); ++i) {
     if (first) {
       for (int j = 0; j < callbacks_.size(); ++j) {
@@ -107,6 +106,7 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
     }
   }
   PROFILE_END("Backward");
+  PROFILE_BEGIN("WaitingToSync");
   return loss;
 }
 

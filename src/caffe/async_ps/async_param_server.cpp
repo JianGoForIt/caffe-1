@@ -7,6 +7,18 @@
 #include "caffe/async_ps/async_param_server.hpp"
 #include "caffe/internode/mpiutil.hpp"
 
+// PROFILING
+
+#define PROFILE_BEGIN(name)      \
+    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
+              << " PROFILING BEGIN[" << name << "]"
+
+              
+#define PROFILE_END(name)      \
+    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
+              << " PROFILING END[" << name << "]"
+
+
 namespace caffe {
 namespace async_param_server {
 
@@ -72,6 +84,7 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     TaskRequest task = to_update.front();
     to_update.pop_front();
 
+    PROFILE_BEGIN("PSUpdate");
     // copy to diff in solver
     Blob<Dtype>* blob = blob_accessor_->get_blob(task.layer_id_, task.blob_id_);
     Dtype* solver_diff = blob->mutable_cpu_diff();
@@ -104,6 +117,7 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     send_queue_mutex_.lock();
     send_tasks_.push_back(task);
     send_queue_mutex_.unlock();
+    PROFILE_END("PSUpdate");
 
     // // DEBUG
     // LOG(INFO) << " push send task for " << task.root_rank_ 
