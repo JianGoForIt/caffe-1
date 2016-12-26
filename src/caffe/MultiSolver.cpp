@@ -39,12 +39,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/make_shared.hpp>
 #include <vector>
 #include "caffe/internode/tree_cluster.hpp"
+#include "caffe/internode/mpiutil.hpp"
 #include "caffe/MultiSolver.hpp"
 
 
 // Modified by Jian
 #include <iostream>
 #include <mpi.h>
+
+// PROFILING
+
+#define PROFILE_BEGIN(name)      \
+    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
+              << " PROFILING BEGIN[" << name << "]"
+
+              
+#define PROFILE_END(name)      \
+    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
+              << " PROFILING END[" << name << "]"
+
 
 namespace caffe {
 
@@ -60,6 +73,7 @@ template <typename Dtype>
 Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
   Dtype loss = 0;
   Net<Dtype>& net = *root_solver_->net();
+  PROFILE_BEGIN("Forward");
   for (int i = 0; i < net.layers().size(); ++i) {
     if (first) {
       for (int j = 0; j < callbacks_.size(); ++j) {
@@ -76,7 +90,9 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
     }
 
   }
+  PROFILE_END("Forward");
 
+  PROFILE_BEGIN("Backward");
   for (int i = net.layers().size() - 1; i >= 0; --i) {
     if (first) {
       for (int j = 0; j < callbacks_.size(); ++j) {
@@ -90,6 +106,7 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
       }
     }
   }
+  PROFILE_END("Backward");
   return loss;
 }
 
