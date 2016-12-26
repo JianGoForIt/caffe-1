@@ -135,13 +135,18 @@ def load_results(log_file_name):
 
     return all_lines
 
-def load_profiling_info(log_file_name):
+def load_profiling_info(log_file_name, line_limit=None):
     all_events = []
+
+    line_number=0
 
     with open(log_file_name, "r") as f:
         for line in f.readlines():
             parsed_dict = parse_profile_log_line(line)
             if parsed_dict:
+                line_number+=1
+                if line_limit and line_number>line_limit:
+                    break
                 all_events.append(parsed_dict)
                 
     return sorted(all_events,key=(lambda elmt: elmt['time']))
