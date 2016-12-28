@@ -67,18 +67,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // #include <sys/types.h>
 // #include <unistd.h>
 #include <mpi.h>
-
-
-// PROFILING
-
-#define PROFILE_BEGIN(name)      \
-    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
-              << " PROFILING BEGIN[" << name << "]"
-
-              
-#define PROFILE_END(name)      \
-    LOG(INFO) << caffe::internode::mpi_get_current_proc_rank_as_string()    \
-              << " PROFILING END[" << name << "]"
+#include "caffe/async_ps/profiling.hpp"
 
 
 namespace caffe {
@@ -536,7 +525,9 @@ class SynchronousSync : public InternalThread
     // for (int i = 0; i < param_ids.size(); ++i) {
     //   solver->ApplyUpdate(param_ids[i]);
     // }
-    
+   
+    PROFILE_BEGIN("Irecv");   
+ 
     int mpi_size;
     int param_server_rank;
     int mpi_rank;
@@ -553,9 +544,15 @@ class SynchronousSync : public InternalThread
       MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
         param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
     }
+    
+    PROFILE_END("Irecv");
+    PROFILE_BEGIN("Waitall");
+    
+
     MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
     free(recv_req);
-    // end of modification
+    PROFILE_END("Waitall");
+    /// end of modification
 
 
     for (int j = 0; j < param_ids.size(); ++j)
