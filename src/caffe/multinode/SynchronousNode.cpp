@@ -613,6 +613,9 @@ class SynchronousSync : public InternalThread
 
     CDLOG(INFO) << "waiting for layer " << layer_id
                 << " in version " << solver->iter();
+    
+    PROFILE_BEGIN("Prep");
+ 
     int waited = layers.at(layer_id).wait_till(this, solver->iter());
 
     if (waited > 0) {
@@ -620,6 +623,8 @@ class SynchronousSync : public InternalThread
               << " version " << solver->iter()
               << " " << (waited / 10.0) << "seconds";
     }
+    
+    PROFILE_END("Prep");
   }
 
   void wait_till_updated() {
