@@ -120,7 +120,7 @@ def load_results(log_file_name):
                      niter,check_loss,check_equals,loss
                     ) =line.split()
                 except ValueError:
-                    print line
+                    # print line
                     continue
                 assert(check_iteration=="Iteration")
                 assert(check_loss=="loss")
@@ -178,6 +178,14 @@ def parse_profile_log_line(line):
         parsed_dict['prof_event']=m.groupdict()['prof_event']
         parsed_dict['prof_name']=m.groupdict()['prof_name']
         #parsed_dict['iteration']=int(m.groupdict()['iteration'])
+        if "layer " in line:
+            try:
+                parsed_dict['layer_id'] = int(line.split("layer ")[1].split(" ")[0] )
+            except ValueError:
+                # print line
+                return {}
+        else:
+            parsed_dict['layer_id'] = -1
         return parsed_dict
     else:
         return {}
