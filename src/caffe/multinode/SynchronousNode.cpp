@@ -232,8 +232,6 @@ class SynchronousSync : public InternalThread
     }
 
     virtual void synced(uint32_t version) {
-      PROFILE_END("WaitingToSync");
-      PROFILE_BEGIN("Forward");
       instance->synced_parameters(version);
     }
 
@@ -419,8 +417,12 @@ class SynchronousSync : public InternalThread
       }
 
       layers_to_update.push_back(make_pair(layer_id, version));
+
+
     }
+
     layers.at(layer_id).wake_up();
+    
   }
   
 
@@ -489,10 +491,14 @@ class SynchronousSync : public InternalThread
         solver->net()->ClearParamDiffs(param_ids[j]);
     }
     keychain->unlock(layer_id);
+    
+
     if (!is_leaf()) {
       // pushes params down the tree
       comms_down->push(layer_id, blob_id, part, version);
     }
+    
+ 
   }
 
   virtual void synced_parameters(int layer_id, uint32_t version) {
@@ -500,12 +506,15 @@ class SynchronousSync : public InternalThread
     CVLOG(2) << "layer " << layer_id
             << " params are ready with version " << version;
 
-
+    PROFILE_BEGIN("Calc") << " layer " << layer_id;
+    
     // allows calculation to continue with the layer
     CDLOG(INFO) << "layer " << layer_id
                << " move to calculating version " << version;
     layers.at(layer_id).set_version(version);
+
     layers.at(layer_id).move_to(LayerState::calculating);
+    
   }
 
   virtual void synced_parameters(uint32_t version) {
@@ -515,6 +524,7 @@ class SynchronousSync : public InternalThread
 
   // Everything below is called from Solver thread only
   void apply_updates(int layer_id, uint32_t version) {
+    
     CHECK(boost::this_thread::get_id() == solver_thread_id);
     keychain->lock(layer_id);
 
@@ -526,7 +536,7 @@ class SynchronousSync : public InternalThread
     //   solver->ApplyUpdate(param_ids[i]);
     // }
    
-    PROFILE_BEGIN("Irecv");   
+    //PROFILE_BEGIN("Irecv");   
  
     int mpi_size;
     int param_server_rank;
@@ -545,15 +555,10 @@ class SynchronousSync : public InternalThread
         param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
     }
     
-    PROFILE_END("Irecv");
-    PROFILE_BEGIN("Waitall");
-    
-
     MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
     free(recv_req);
-    PROFILE_END("Waitall");
-    /// end of modification
 
+    PROFILE_BEGIN("Calc") << " layer " << layer_id;
 
     for (int j = 0; j < param_ids.size(); ++j)
       solver->net()->ClearParamDiffs(param_ids[j]);
@@ -614,9 +619,11 @@ class SynchronousSync : public InternalThread
     CDLOG(INFO) << "waiting for layer " << layer_id
                 << " in version " << solver->iter();
     
-    PROFILE_BEGIN("Prep");
+    PROFILE_BEGIN("Prep") << " layer " << layer_id;
  
     int waited = layers.at(layer_id).wait_till(this, solver->iter());
+
+    PROFILE_END("Calc") << " layer " << layer_id;
 
     if (waited > 0) {
       CVLOG(1) << "waited on layer " << layer_id
@@ -624,7 +631,7 @@ class SynchronousSync : public InternalThread
               << " " << (waited / 10.0) << "seconds";
     }
     
-    PROFILE_END("Prep");
+    PROFILE_END("Prep") << " layer " << layer_id;
   }
 
   void wait_till_updated() {
