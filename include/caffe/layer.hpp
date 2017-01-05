@@ -48,6 +48,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/math_functions.hpp"
 
+#include "caffe/async_ps/profiling.hpp"
+
+
 /**
  Forward declare boost::thread instead of including boost/thread.hpp
  to avoid a boost/NVCC issues (#1009, #1010) on OSX.
@@ -489,6 +492,9 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
   // Lock during forward to ensure sequential forward
   Lock();
+  
+  PROFILE_BEGIN("FCompNoLock") << " layer " << -1;
+
   Dtype loss = 0;
   Reshape(bottom, top);
   switch (Caffe::mode()) {
@@ -519,6 +525,9 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
   default:
     LOG(FATAL) << "Unknown caffe mode.";
   }
+
+  PROFILE_END("FCompNoLock") << " layer " << -1;
+
   Unlock();
   return loss;
 }
