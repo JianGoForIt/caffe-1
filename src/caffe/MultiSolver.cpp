@@ -98,6 +98,8 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
 
     PROFILE_END("BComp") << " layer " << i;
 
+    PROFILE_BEGIN("WaitTree") << " layer " << i;
+
     if (last) {
       for (int j = 0; j < callbacks_.size(); ++j) {
         callbacks_[j]->on_gradients_ready(i);

@@ -389,6 +389,9 @@ class SynchronousSync : public InternalThread
   virtual void synced_gradients(int layer_id, uint32_t version) {
     CVLOG(2) << "layer " << layer_id
                << " gradients are in synced with version " << version;
+    
+    PROFILE_END("WaitTree") << " layer " << layer_id;    
+
     if (is_root()) {
       // Modified by Jian
       // if the node is root push the gradient 
@@ -554,9 +557,14 @@ class SynchronousSync : public InternalThread
       MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
         param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
     }
-    
+   
+    PROFILE_BEGIN("WaitPS") << " layer " << layer_id;
+ 
     MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
     free(recv_req);
+
+    PROFILE_END("WaitPS") << " layer " << layer_id;
+
 
     PROFILE_BEGIN("Calc") << " layer " << layer_id;
 
