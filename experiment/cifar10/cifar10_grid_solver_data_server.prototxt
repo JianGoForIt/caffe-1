@@ -1,1 +1,0 @@
-train_net: "experiment/cifar10/cifar10_grid_train_test_data_server.prototxt"
