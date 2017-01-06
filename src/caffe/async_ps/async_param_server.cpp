@@ -82,7 +82,7 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     TaskRequest task = to_update.front();
     to_update.pop_front();
 
-    PROFILE_BEGIN("PSUpdate");
+    PROFILE_BEGIN("PSUpdate") << " layer " << task.layer_id_;
     // copy to diff in solver
     Blob<Dtype>* blob = blob_accessor_->get_blob(task.layer_id_, task.blob_id_);
     Dtype* solver_diff = blob->mutable_cpu_diff();
@@ -117,7 +117,7 @@ void AsyncParamServer<Dtype>::ProcessUpdateTask() {
     send_queue_mutex_.lock();
     send_tasks_.push_back(task);
     send_queue_mutex_.unlock();
-    PROFILE_END("PSUpdate");
+    PROFILE_END("PSUpdate") << " layer " << task.layer_id_;
 
     // // DEBUG
     // LOG(INFO) << " push send task for " << task.root_rank_ 

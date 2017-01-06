@@ -181,8 +181,18 @@ void mpi_finalize() {
 int LayerIdToServerRank(int n_layer, int layer_id) {
   int mpi_size;
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-  int param_server_rank = (mpi_size - caffe::internode::nServer)
-    + layer_id / (n_layer / caffe::internode::nServer + 1);
+  //int param_server_rank = (mpi_size - caffe::internode::nServer)
+    //+ layer_id / (n_layer / caffe::internode::nServer + 1);
+  int param_server_rank = mpi_size - caffe::internode::nServer;
+  switch (layer_id) {
+    case 3: param_server_rank += 0; break;
+    case 7: param_server_rank += 1; break;
+    case 11: param_server_rank += 2; break;
+    case 15: param_server_rank += 3; break;
+    case 19: param_server_rank += 4; break;
+    case 22: param_server_rank += 5; break;
+    defalut: param_server_rank += 2; 
+  }
   return param_server_rank;
 }
 
