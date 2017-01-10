@@ -27,7 +27,8 @@ struct TaskRequest {
   int blob_id_;
   int part_id_;
   MPI_Request mpi_request_;
-
+  
+  TaskRequest(): root_rank_(0), layer_id_(0), blob_id_(0), part_id_(0), mpi_request_() {}
   TaskRequest(int root_rank, int layer_id, int blob_id, int part_id) :
     root_rank_(root_rank), layer_id_(layer_id), blob_id_(blob_id), part_id_(part_id) {}
   void ParseInfo(int64_t mpi_rank, int64_t mpi_tag) {

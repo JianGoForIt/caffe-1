@@ -67,8 +67,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // #include <sys/types.h>
 // #include <unistd.h>
 #include <mpi.h>
+#include <map>
 #include "caffe/async_ps/profiling.hpp"
-
+#include <cassert>
 
 namespace caffe {
 
@@ -214,6 +215,12 @@ class SynchronousSync : public InternalThread
   int snapshot_per_iters;
   vector<pair<int, uint32_t> > layers_to_update;
 
+  // we use the map of requet to monitor update tasks to be done. We only perform the task
+  // when the requied model blob is already on the current node.
+  std::map<std::pair<int, int>,async_param_server::TaskRequest> request_received_from_param_server;
+  std::map<int, uint32_t> request_version;
+  boost::mutex request_mutex;
+
  public:
   shared_ptr<BlobKeyChain<Dtype> > keychain;
  public:
@@ -358,6 +365,17 @@ class SynchronousSync : public InternalThread
     down_sync->add_remote(waypoint->id());
     for (int i = 0; i < waypoint->children().size(); ++i)
       down_sync->add_remote(waypoint->children()[i]);
+   
+   assert(request_received_from_param_server.size == 0); 
+   for (int j = 0; j < solver->net()->layers().size(); j++) {
+      for (int k = 0; k < solver->net()->layers()[j]->blobs().size(); k++) {
+        // Note root rank here is not relevant
+	async_param_server::TaskRequest recv_task(-1, j, k, 0);
+        recv_task.mpi_request_ = MPI_REQUEST_NULL;
+        request_received_from_param_server.insert(std::make_pair(std::make_pair(j, k), recv_task) );
+      }
+      request_version.insert(std::make_pair(j, 0) );
+    }
 
     if (solver->iter() == 0)
       solver->set_iter(1);
@@ -427,7 +445,20 @@ class SynchronousSync : public InternalThread
           param_server_rank, tag, MPI_COMM_WORLD, &dump_req);
       }
 
-      layers_to_update.push_back(make_pair(layer_id, version));
+      request_mutex.lock();
+      for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+        Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+        async_param_server::TaskRequest* task = &(request_received_from_param_server[std::make_pair(layer_id, blob_id) ] );
+        int tag = task->GetTag();
+
+	
+	MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+          param_server_rank, tag, MPI_COMM_WORLD, &(task->mpi_request_));
+      }
+      request_version[layer_id] = version;
+      request_mutex.unlock();
+
+      //layers_to_update.push_back(make_pair(layer_id, version));
 
 
     }
@@ -549,36 +580,36 @@ class SynchronousSync : public InternalThread
    
     //PROFILE_BEGIN("Irecv");   
  
-    int mpi_size;
-    int param_server_rank;
-    int mpi_rank;
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    // param_server_rank = mpi_size - 1;
-    int n_layer = solver->net()->layers().size();
-    param_server_rank = caffe::internode::LayerIdToServerRank(n_layer, layer_id);
-    int n_blob = solver->net()->layers()[layer_id]->blobs().size();
-    MPI_Request* recv_req = (MPI_Request*)malloc(sizeof(MPI_Request) * n_blob);
+    //int mpi_size;
+    //int param_server_rank;
+    //int mpi_rank;
+    //MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    //MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    //// param_server_rank = mpi_size - 1;
+    //int n_layer = solver->net()->layers().size();
+    //param_server_rank = caffe::internode::LayerIdToServerRank(n_layer, layer_id);
+    //int n_blob = solver->net()->layers()[layer_id]->blobs().size();
+    //MPI_Request* recv_req = (MPI_Request*)malloc(sizeof(MPI_Request) * n_blob);
     
     //// DEBUG
     //LOG(INFO) << "root rank " << mpi_rank << " recv layer" 
     //  << layer_id << "/" << n_layer << " from server rank " << param_server_rank;
 
-    for (int blob_id = 0; blob_id < n_blob; blob_id++) {
-      Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
-      async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
-      int tag = task.GetTag();
+    //for (int blob_id = 0; blob_id < n_blob; blob_id++) {
+    //  Blob<Dtype>* blob = blob_accessor->get_blob(layer_id, blob_id);
+    //  async_param_server::TaskRequest task(mpi_rank, layer_id, blob_id, 0);
+    //  int tag = task.GetTag();
 
-      MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
-        param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
-    }
+    //  MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
+    //    param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
+    //}
    
-    PROFILE_BEGIN("WaitPS") << " layer " << layer_id;
+    //PROFILE_BEGIN("WaitPS") << " layer " << layer_id;
  
-    MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
-    free(recv_req);
+    //MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
+    //free(recv_req);
 
-    PROFILE_END("WaitPS") << " layer " << layer_id;
+    //PROFILE_END("WaitPS") << " layer " << layer_id;
 
 
     PROFILE_BEGIN("Calc") << " layer " << layer_id;
@@ -605,10 +636,34 @@ class SynchronousSync : public InternalThread
   void apply_updates() {
     CHECK(boost::this_thread::get_id() == solver_thread_id);
     vector<pair<int, uint32_t> > to_update;
-    {
-      boost::mutex::scoped_lock lock(mtx);
-      to_update.swap(layers_to_update);
-    }
+   // {
+   //   boost::mutex::scoped_lock lock(mtx);
+   //   to_update.swap(layers_to_update);
+   // }
+    request_mutex.lock();
+    for (int j = 0; j < solver->net()->layers().size(); j++) {
+      bool ready = true;
+      for (int k = 0; k < solver->net()->layers()[j]->blobs().size(); k++) { 
+        async_param_server::TaskRequest* task = &(request_received_from_param_server[std::make_pair(j, k) ] );
+        if (task->mpi_request_ != MPI_REQUEST_NULL) {
+          int flag = 0;
+          LOG(INFO) << "first test ";
+          MPI_Test(&(task->mpi_request_), &flag, MPI_STATUS_IGNORE);
+          if (flag == 0) {
+            ready = false;
+            break;
+	  }
+        }
+        else {
+	  ready = false;
+          break;
+	}
+      }
+      if (ready)
+	to_update.push_back(std::make_pair(j, request_version[j] ) );
+    }   
+    request_mutex.unlock(); 
+
     if (to_update.size() > 0)
       CDLOG(INFO) << "apply_updates: " << to_update.size();
     for (int i = 0; i < to_update.size(); ++i)
