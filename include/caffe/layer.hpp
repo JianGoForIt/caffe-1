@@ -493,7 +493,7 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
   // Lock during forward to ensure sequential forward
   Lock();
   
-  PROFILE_BEGIN("FCompNoLock") << " layer " << -1;
+  //PROFILE_BEGIN("FCompNoLock") << " layer " << -1;
 
   Dtype loss = 0;
   Reshape(bottom, top);
@@ -526,7 +526,7 @@ inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
     LOG(FATAL) << "Unknown caffe mode.";
   }
 
-  PROFILE_END("FCompNoLock") << " layer " << -1;
+  //PROFILE_END("FCompNoLock") << " layer " << -1;
 
   Unlock();
   return loss;

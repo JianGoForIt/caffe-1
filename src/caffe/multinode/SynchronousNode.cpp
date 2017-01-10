@@ -390,7 +390,9 @@ class SynchronousSync : public InternalThread
     CVLOG(2) << "layer " << layer_id
                << " gradients are in synced with version " << version;
     
+#ifdef PROFILING
     PROFILE_END("WaitTree") << " layer " << layer_id;    
+#endif
 
     if (is_root()) {
       // Modified by Jian
@@ -517,7 +519,7 @@ class SynchronousSync : public InternalThread
     CVLOG(2) << "layer " << layer_id
             << " params are ready with version " << version;
 
-    PROFILE_BEGIN("Calc") << " layer " << layer_id;
+    //PROFILE_BEGIN("Calc") << " layer " << layer_id;
     
     // allows calculation to continue with the layer
     CDLOG(INFO) << "layer " << layer_id
@@ -547,8 +549,6 @@ class SynchronousSync : public InternalThread
     //   solver->ApplyUpdate(param_ids[i]);
     // }
    
-    //PROFILE_BEGIN("Irecv");   
- 
     int mpi_size;
     int param_server_rank;
     int mpi_rank;
@@ -573,15 +573,18 @@ class SynchronousSync : public InternalThread
         param_server_rank, tag, MPI_COMM_WORLD, recv_req + blob_id);
     }
    
+#ifdef PROFILING
     PROFILE_BEGIN("WaitPS") << " layer " << layer_id;
- 
+#endif 
+
     MPI_Waitall(n_blob, recv_req, MPI_STATUSES_IGNORE);
     free(recv_req);
 
+#ifdef PROFILING
     PROFILE_END("WaitPS") << " layer " << layer_id;
+#endif
 
-
-    PROFILE_BEGIN("Calc") << " layer " << layer_id;
+    //PROFILE_BEGIN("Calc") << " layer " << layer_id;
 
     for (int j = 0; j < param_ids.size(); ++j)
       solver->net()->ClearParamDiffs(param_ids[j]);
@@ -642,19 +645,24 @@ class SynchronousSync : public InternalThread
     CDLOG(INFO) << "waiting for layer " << layer_id
                 << " in version " << solver->iter();
     
+#ifdef PROFILING
     PROFILE_BEGIN("Prep") << " layer " << layer_id;
- 
+#endif 
+
     int waited = layers.at(layer_id).wait_till(this, solver->iter());
 
-    PROFILE_END("Calc") << " layer " << layer_id;
+    //PROFILE_END("Calc") << " layer " << layer_id;
 
     if (waited > 0) {
       CVLOG(1) << "waited on layer " << layer_id
               << " version " << solver->iter()
               << " " << (waited / 10.0) << "seconds";
     }
-    
+
+#ifdef PROFILING    
     PROFILE_END("Prep") << " layer " << layer_id;
+#endif
+
   }
 
   void wait_till_updated() {

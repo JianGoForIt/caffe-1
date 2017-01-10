@@ -70,12 +70,16 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
       }
     }
     
+#ifdef PROFILING
     PROFILE_BEGIN("FComp") << " layer " << i;
+#endif
 
     vector<int> param_ids = net.get_layer_learnable_param_ids(i);
     loss += root_solver_->net()->ForwardFromTo(i, i);
 
+#ifdef PROFILING
     PROFILE_END("FComp") << " layer " << i;
+#endif
 
     if (last) {
       for (int j = 0; j < callbacks_.size(); ++j) {
@@ -92,13 +96,19 @@ Dtype MultiSolver<Dtype>::ForwardBackwardImpl(bool first, bool last) {
       }
     }
     
+#ifdef PROFILING
     PROFILE_BEGIN("BComp") << " layer " << i;
+#endif
 
     root_solver_->net()->BackwardFromTo(i, i);
 
+#ifdef PROFILING
     PROFILE_END("BComp") << " layer " << i;
+#endif
 
+#ifdef PROFILING
     PROFILE_BEGIN("WaitTree") << " layer " << i;
+#endif
 
     if (last) {
       for (int j = 0; j < callbacks_.size(); ++j) {
