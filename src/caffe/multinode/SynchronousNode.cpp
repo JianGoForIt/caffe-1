@@ -656,7 +656,7 @@ class SynchronousSync : public InternalThread
           LOG(INFO) << "first test ";
           MPI_Test(&(task->mpi_request_), &flag, MPI_STATUS_IGNORE);
           
-          LOG(INFO) << "test done flag " << flag << " l b " << j << " " << k;
+         // LOG(INFO) << "test done flag " << flag << " l b " << j << " " << k;
 
           if (flag == 0) {
             ready = false;
