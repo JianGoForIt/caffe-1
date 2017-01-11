@@ -456,6 +456,11 @@ class SynchronousSync : public InternalThread
 	
 	MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
           param_server_rank, tag, MPI_COMM_WORLD, &(task->mpi_request_));
+        
+#ifdef PROFILING 
+        PROFILE_BEGIN("Req") << " layer " << layer_id << " blob " << blob_id;
+#endif
+
       }
       request_version[layer_id] = version;
       request_mutex.unlock();
@@ -650,6 +655,9 @@ class SynchronousSync : public InternalThread
           int flag = 0;
           LOG(INFO) << "first test ";
           MPI_Test(&(task->mpi_request_), &flag, MPI_STATUS_IGNORE);
+          
+          LOG(INFO) << "test done flag " << flag << " l b " << j << " " << k;
+
           if (flag == 0) {
             ready = false;
             break;
@@ -660,8 +668,13 @@ class SynchronousSync : public InternalThread
           break;
 	}
       }
-      if (ready)
+      if (ready) {
 	to_update.push_back(std::make_pair(j, request_version[j] ) );
+
+#ifdef PROFILING
+        PROFILE_BEGIN("Ready") << "layer " << j << "ready";
+#endif
+      }
     }   
     request_mutex.unlock(); 
 
