@@ -645,9 +645,9 @@ class SynchronousSync : public InternalThread
     CDLOG(INFO) << "waiting for layer " << layer_id
                 << " in version " << solver->iter();
     
-#ifdef PROFILING
-    PROFILE_BEGIN("Prep") << " layer " << layer_id;
-#endif 
+//#ifdef PROFILING
+//    PROFILE_BEGIN("Prep") << " layer " << layer_id;
+//#endif 
 
     int waited = layers.at(layer_id).wait_till(this, solver->iter());
 
@@ -659,9 +659,9 @@ class SynchronousSync : public InternalThread
               << " " << (waited / 10.0) << "seconds";
     }
 
-#ifdef PROFILING    
-    PROFILE_END("Prep") << " layer " << layer_id;
-#endif
+//#ifdef PROFILING    
+//    PROFILE_END("Prep") << " layer " << layer_id;
+//#endif
 
   }
 
@@ -739,8 +739,18 @@ class SynchronousNode<Dtype>::Impl : public MultiSolver<Dtype>::Callback {
 
   void on_start(int layer_id) {
     CDLOG(INFO) << "started forward of layer " << layer_id;
+
+#ifdef PROFILING
+    PROFILE_BEGIN("Prep") << " layer " << layer_id;
+#endif
+
     sync.apply_updates();
     sync.prepare_for_calculation(layer_id);
+
+#ifdef PROFILING
+    PROFILE_END("Prep") << " layer " << layer_id;
+#endif
+
   }
 
   void on_forward_finished(int layer_id) {
