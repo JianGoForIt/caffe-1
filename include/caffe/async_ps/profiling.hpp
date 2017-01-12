@@ -3,7 +3,7 @@
 
 #include "caffe/internode/mpiutil.hpp"
 
-#define PROFILING
+//#define PROFILING
 
 // PROFILING
 

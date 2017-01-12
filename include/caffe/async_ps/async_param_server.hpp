@@ -20,7 +20,7 @@ namespace async_param_server {
 using std::make_pair;
 
 // TODO modify decoding strategy
-// we use TAG = layer_id * 1e6 + blob_id * 1e4 + part_id to identify parts location
+// we use TAG = layer_id * 100 + blob_id * 10 + part_id + 1973 to identify parts location
 struct TaskRequest {
   int root_rank_;
   int layer_id_; 
