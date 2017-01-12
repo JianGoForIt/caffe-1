@@ -374,8 +374,6 @@ class SynchronousSync : public InternalThread
         recv_task.mpi_request_ = MPI_REQUEST_NULL;
         request_received_from_param_server.insert(std::make_pair(std::make_pair(j, k), recv_task) );
         need_update.insert(std::make_pair(j, false) );
-	//request_received_from_param_server[std::make_pair(j, k) ].SetInitialized(false);
-        //LOG(INFO) << "test null " << request_received_from_param_server[std::make_pair(j, k) ].mpi_request_ << " " << MPI_REQUEST_NULL; 
       }
       request_version.insert(std::make_pair(j, 0) );
     }
@@ -454,7 +452,7 @@ class SynchronousSync : public InternalThread
 	MPI_Irecv(blob->mutable_cpu_data(), blob->count(), DtypeToMPIDtype<Dtype>(),
           param_server_rank, tag, MPI_COMM_WORLD, &(task->mpi_request_));
 
-        PROFILE_BEGIN("Req after") << " layer " << layer_id << " blob " << blob_id << " request " << task->mpi_request_ << " " << &(task->mpi_request_) << " ver " << version;
+        //PROFILE_BEGIN("Req after") << " layer " << layer_id << " blob " << blob_id << " request " << task->mpi_request_ << " " << &(task->mpi_request_) << " ver " << version;
 
       }
       need_update[layer_id] = true;
@@ -621,8 +619,8 @@ class SynchronousSync : public InternalThread
           int flag = 0;
           MPI_Test(&(task->mpi_request_), &flag, MPI_STATUS_IGNORE);
           
-          if (flag)
-            PROFILE_BEGIN("check after") << " layer " << j << " blob " << k << " request " << task->mpi_request_ << " flag " << flag << " ver " << request_version[j];
+          //if (flag)
+          //  PROFILE_BEGIN("check after") << " layer " << j << " blob " << k << " request " << task->mpi_request_ << " flag " << flag << " ver " << request_version[j];
 
           if (flag == 0) {
             ready = false;
@@ -633,7 +631,7 @@ class SynchronousSync : public InternalThread
       if (ready) {
 	to_update.push_back(std::make_pair(j, request_version[j] ) );
         need_update[j] = false;        
-        PROFILE_BEGIN("update exe") << " layer " << j << " ver " << request_version[j];
+        //PROFILE_BEGIN("update exe") << " layer " << j << " ver " << request_version[j];
       }
     }   
     request_mutex.unlock(); 
@@ -671,9 +669,9 @@ class SynchronousSync : public InternalThread
     CDLOG(INFO) << "waiting for layer " << layer_id
                 << " in version " << solver->iter();
     
-#ifdef PROFILING
-    PROFILE_BEGIN("Prep") << " layer " << layer_id;
-#endif 
+//#ifdef PROFILING
+//    PROFILE_BEGIN("Prep") << " layer " << layer_id;
+//#endif 
 
     int waited = layers.at(layer_id).wait_till(this, solver->iter());
 
@@ -683,9 +681,9 @@ class SynchronousSync : public InternalThread
               << " " << (waited / 10.0) << "seconds";
     }
 
-#ifdef PROFILING    
-    PROFILE_END("Prep") << " layer " << layer_id;
-#endif
+//#ifdef PROFILING    
+//    PROFILE_END("Prep") << " layer " << layer_id;
+//#endif
 
   }
 
@@ -763,8 +761,18 @@ class SynchronousNode<Dtype>::Impl : public MultiSolver<Dtype>::Callback {
 
   void on_start(int layer_id) {
     CDLOG(INFO) << "started forward of layer " << layer_id;
+
+#ifdef PROFILING
+    PROFILE_BEGIN("Prep") << " layer " << layer_id;
+#endif
+
     sync.apply_updates();
     sync.prepare_for_calculation(layer_id);
+
+#ifdef PROFILING
+    PROFILE_END("Prep") << " layer " << layer_id;
+#endif
+
   }
 
   void on_forward_finished(int layer_id) {
